@@ -1,13 +1,8 @@
-## 2.3.0
-
-* Dart 3 only
-
-## 2.2.8+4
+## 2.2.8+3
 
 * Android: Adds a namespace for compatibility with AGP 8.0.
 * Android: Use compile SDK 33
 * Export global sqflite API
-* iOS set minimum deployment target to 11.0
 
 ## 2.2.7
 

@@ -70,7 +70,7 @@ bool? verify(bool? condition, [String? message]) {
 }
 
 /// Group.
-abstract mixin class Group {
+abstract class Group {
   /// List of tests.
   List<Test> get tests;
 
