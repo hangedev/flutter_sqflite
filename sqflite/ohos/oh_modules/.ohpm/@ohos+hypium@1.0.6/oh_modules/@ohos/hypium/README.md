@@ -195,7 +195,7 @@ XX -s class attributeTest#testAttributeIt,abilityTest#testAbilityIt
 ```
 该命令的作用是：筛选测试应用中attributeTest测试套下的testAttributeIt测试用例，abilityTest测试套下的testAbilityIt测试用例，只执行这两条用例。
 
-- 其他能力
+#### 其他能力
 
 | 能力项       | Key     | 含义说明                     | Value取值范围                                  |
 | ------------ | ------- | ---------------------------- | ---------------------------------------------- |
