@@ -239,12 +239,41 @@ export class SqfLiteHelper {
     let dbNameList: string[] = dataBaseName.split('/');
     let dbName: string = dbNameList[dbNameList.length - 1];
     let endWithDb: boolean = Tools.stringEndWith(dbName, '.db');
-    Log.i(TAG, 'step:-1 delete asction, got database name:' + dataBaseName + 'endWithDb:' + endWithDb);
+    Log.i(TAG, 'step:-1 delete action, got database name:' + dataBaseName + 'endWithDb:' + endWithDb);
     if (!endWithDb) {
       dbName = dbName + '.db';
+      dataBaseName = dataBaseName + '.db';
     }
-    dataBaseName = dbName;
+
     Log.i(TAG, 'step:0 delete action, got database name:' + dataBaseName + 'endWithDb:' + endWithDb);
+
+    //自定义数据库路径
+    let customDir: string = '';
+    for (let index = 5; index < dbNameList.length - 1; index++) {
+      if (customDir.length > 0) {
+        customDir = customDir + '/' + dbNameList[index];
+      } else {
+        customDir = dbNameList[index];
+      }
+    }
+
+    Log.i(TAG, '~~custom db Dir: ' + customDir + ' system version:' + deviceInfo.osFullName, '');
+
+    // 从系统中获取
+    let config: relationalStore.StoreConfig;
+    if (customDir.length > 0) {
+      config = {
+        name: dbName, // 数据库文件名
+        securityLevel: relationalStore.SecurityLevel.S1, // 数据库安全级别
+        customDir: customDir,
+      };
+    } else {
+      config = {
+        name: dbName, // 数据库文件名
+        securityLevel: relationalStore.SecurityLevel.S1, // 数据库安全级别
+      }
+    }
+
     if (SqfLiteHelper.dataBaseList.has(dataBaseName)) {
       Log.i(TAG, 'step:1 already loaded database, trying delete' + dataBaseName);
       SqfLiteHelper.dataBaseList.delete(dataBaseName);
@@ -256,10 +285,11 @@ export class SqfLiteHelper {
       })
       if (id > -1) {
         SqfLiteHelper.dBIdList.delete(id);
-        await relationalStore.deleteRdbStore(context, dataBaseName);
-        Log.i(TAG, 'step:2 already deleted ' + dataBaseName + ' 数据库', '%{public}s');
+        await relationalStore.deleteRdbStore(context, config);
         result = true;
+        return result;
       }
+      return result;
     } else {
       Log.i(TAG, 'step:3 unload database, trying delete' + dataBaseName);
       try {
@@ -267,15 +297,16 @@ export class SqfLiteHelper {
         if (await SqfLiteHelper.checkTable(dataBaseName, 'defaultTable') == true) {
           await SqfLiteHelper.deleteTable(dataBaseName, 'defaultTable');
         }
-        await relationalStore.deleteRdbStore(context, dataBaseName);
-        Log.i(TAG, 'step:4 already deleted ' + dataBaseName + ' 数据库', '%{public}s');
+
+        await relationalStore.deleteRdbStore(context, config);
         result = true;
+        return result;
       } catch (e) {
         Log.i(TAG, 'step:5 deleted database error' + e, '%{public}s');
+        return result;
       }
     }
-    // Log.i(TAG, 'can not found this database, delete faired', '%{public}s');
-    return result;
+
   }
 
   public static async insert(call: MethodCall, result: MethodResult, dataBase: relationalStore.RdbStore): Promise<number> {

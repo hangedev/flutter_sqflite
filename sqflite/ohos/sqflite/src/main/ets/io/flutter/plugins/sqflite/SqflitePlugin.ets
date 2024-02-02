@@ -35,6 +35,8 @@ import { ValueType } from '@ohos.data.ValuesBucket';
 import { SqlHelper } from './sql_helper';
 import { Constant } from './constant';
 import MethodCall from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodCall';
+import { Database } from './Database';
+import { MethodCallOperation } from './operation/MethodCallOperation';
 
 const TAG: string = "SqflitePlugin";
 
@@ -162,8 +164,8 @@ export default class SqflitePlugin extends SqfliteApi implements FlutterPlugin, 
 
   ///检查数据库是否存在
   async handleDatabaseExistsCall(call: MethodCall, result: MethodResult): Promise<void> {
-    let daPath: string = call.argument(Constant.PARAM_PATH);
-    let isExist: boolean = await SqfLiteHelper.checkDatabaseExisted(daPath);
+    let dbPath: string = call.argument(Constant.PARAM_PATH);
+    let isExist: boolean = await SqfLiteHelper.checkDatabaseExisted(dbPath);
     result.success(isExist);
   }
 
@@ -173,10 +175,9 @@ export default class SqflitePlugin extends SqfliteApi implements FlutterPlugin, 
     if (rdbStore == null) {
       return;
     }
+    let operation: MethodCallOperation = new MethodCallOperation(call, result);
 
-    let sql: string = call.argument(Constant.PARAM_SQL);
-    let sqlArguments: ValueType[] | undefined = call.argument(Constant.PARAM_SQL_ARGUMENTS);
-    SqfLiteHelper.execute(sql, sqlArguments, call, result, rdbStore);
+    Database.execute(operation, rdbStore);
   }
 
   ///插入数据
@@ -185,21 +186,43 @@ export default class SqflitePlugin extends SqfliteApi implements FlutterPlugin, 
     if (rdbStore == null) {
       return;
     }
+
     let sql: string = call.argument(Constant.PARAM_SQL);
-    let sqlArguments: ValueType[] | undefined = call.argument(Constant.PARAM_SQL_ARGUMENTS);
-    await SqfLiteHelper.insertSql(sql, sqlArguments, call, result, rdbStore);
+    let dataBaseId: number = call.argument(Constant.PARAM_ID);
+    let databaseName: string = SqfLiteHelper.dBIdList.get(dataBaseId) as string;
+    let tableName: string = SqlHelper.getInsertSqlTableName(sql);
+
+    let tableExisted = await SqfLiteHelper.checkTable(databaseName, tableName);
+    if(tableName.length > 0 && !tableExisted) {
+      result.error(Constant.SQLITE_ERROR, 'no such table:' + tableName, '');
+      return;
+    }
+
+    let operation: MethodCallOperation = new MethodCallOperation(call, result);
+    Database.insert(operation, rdbStore);
   }
 
   ///查询数据
   async handleQueryCall(call: MethodCall, result: MethodResult): Promise<void> {
+    Log.i(TAG, "begin query data");
     let rdbStore = SqfLiteHelper.getDatabaseOrError(call, result);
     if (rdbStore == null) {
       return;
     }
+
     let sql: string = call.argument(Constant.PARAM_SQL);
-    let sqlArguments: ValueType[] | undefined = call.argument(Constant.PARAM_SQL_ARGUMENTS);
-    let cursorPageSize: number | undefined = call.argument(Constant.PARAM_CURSOR_PAGE_SIZE);
-    await SqfLiteHelper.querySql(sql, sqlArguments, call, result, rdbStore, cursorPageSize);
+    let dataBaseId: number = call.argument(Constant.PARAM_ID);
+    let databaseName: string = SqfLiteHelper.dBIdList.get(dataBaseId) as string;
+    let tableName: string = SqlHelper.getQuerySqlTableName(sql);
+
+    let tableExisted = await SqfLiteHelper.checkTable(databaseName, tableName);
+    if(tableName.length > 0 && !tableExisted) {
+      result.error(Constant.SQLITE_ERROR, 'no such table:' + tableName, '');
+      return;
+    }
+
+    let operation: MethodCallOperation = new MethodCallOperation(call, result);
+    Database.query(operation, rdbStore);
   }
 
   ///更新（包括删除）数据
@@ -208,9 +231,20 @@ export default class SqflitePlugin extends SqfliteApi implements FlutterPlugin, 
     if (rdbStore == null) {
       return;
     }
+
     let sql: string = call.argument(Constant.PARAM_SQL);
-    let sqlArguments: ValueType[] | undefined = call.argument(Constant.PARAM_SQL_ARGUMENTS);
-    await SqfLiteHelper.updateSql(sql, sqlArguments, call, result, rdbStore);
+    let dataBaseId: number = call.argument(Constant.PARAM_ID);
+    let databaseName: string = SqfLiteHelper.dBIdList.get(dataBaseId) as string;
+    let tableName: string = SqlHelper.getUpdateSqlTableName(sql);
+
+    let tableExisted = await SqfLiteHelper.checkTable(databaseName, tableName);
+    if(tableName.length > 0 && !tableExisted) {
+      result.error(Constant.SQLITE_ERROR, 'no such table:' + tableName, '');
+      return;
+    }
+
+    let operation: MethodCallOperation = new MethodCallOperation(call, result);
+    Database.update(operation, rdbStore);
   }
 
   ///batch操作
@@ -219,7 +253,7 @@ export default class SqflitePlugin extends SqfliteApi implements FlutterPlugin, 
     if (rdbStore == null) {
       return;
     }
-    SqfLiteHelper.batch(call, result, rdbStore);
+    Database.batch(call, result, rdbStore);
   }
 
   ///Options操作，设置LogLevel，仅限开发，已废弃
