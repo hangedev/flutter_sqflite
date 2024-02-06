@@ -74,27 +74,7 @@
                 <filteritem type="filename" name="*.so|*.har" desc="engine二进制文件,不影响兼容性"/>
                 <filteritem type="filename" name="*.tgz" desc="hvigor本地插件,不影响兼容性"/>
                 <filteritem type="filename" name="*.dat" desc="ohos自动生成的二进制文件,不影响兼容性"/>
-                <filteritem type="filepath" name="flutter_music_player/ohos/har/" desc="har依赖库，不影响兼容性"/>
-                <filteritem type="filepath" name="flutter_music_player/ohos/entry/src/main/resources/rawfile/flutter_assets/" desc="资源文件，不影响兼容性"/>
-                <filteritem type="filepath" name="flutter_music_player/ohos/dta/icudtl.dat" desc="ohos字体库文件，不影响兼容性"/>
-                <filteritem type="filepath" name="flutter_music_player/ohos/hvigor/hvigor-wrapper.js" desc="hvigorw编译程序，不影响兼容性"/>
-                <filteritem type="filepath" name="flutter_music_player/ohos/hvigorw.bat" desc="hvigorw编译程序，不影响兼容性"/>
-                <filteritem type="filepath" name="flutter_smart_agriculture/ohos/har/" desc="har依赖库，不影响兼容性"/>
-                <filteritem type="filepath" name="flutter_smart_agriculture/ohos/dta/icudtl.dat" desc="ohos字体库文件，不影响兼容性"/>
-                <filteritem type="filepath" name="flutter_smart_agriculture/ohos/hvigor/hvigor-wrapper.js" desc="hvigorw编译程序，不影响兼容性"/>
-                <filteritem type="filepath" name="flutter_smart_agriculture/ohos/hvigorw.bat" desc="hvigorw编译程序，不影响兼容性"/>
-                <filteritem type="filepath" name="flutter_smart_agriculture/android/" desc="flutter sdk自动生成代码，不影响兼容性"/>
-                <filteritem type="filepath" name="flutter_smart_agriculture/linux/" desc="flutter sdk自动生成代码，不影响兼容性"/>
-                <filteritem type="filepath" name="flutter_smart_agriculture/web/" desc="flutter sdk自动生成代码，不影响兼容性"/>
-                <filteritem type="filepath" name="flutter_smart_agriculture/macos/" desc="flutter sdk自动生成代码，不影响兼容性"/>
-                <filteritem type="filepath" name="flutter_smart_agriculture/ios/" desc="flutter sdk自动生成代码，不影响兼容性"/>
-                <filteritem type="filepath" name="flutter_smart_agriculture/windows/" desc="flutter sdk自动生成代码，不影响兼容性"/>
-                <filteritem type="filepath" name="ohos/lz_path_parsing_test_os/ohos/entry/src/ohosTest/ets/test/" desc="ohos自动生成代码，不影响兼容性"/>
-                <filteritem type="filepath" name="ohos/lz_petitparser_test_os/ohos/entry/src/ohosTest/ets/test/" desc="ohos自动生成代码，不影响兼容性"/>
-                <filteritem type="filepath" name="ohos/lz_xml_test_os/ohos/entry/src/ohosTest/ets/test/" desc="ohos自动生成代码，不影响兼容性"/>
-                <filteritem type="filepath" name="ohos/lz_path_parsing_test_os/ohos/har" desc="ohos打包文件，不影响兼容性"/>
-                <filteritem type="filepath" name="ohos/lz_xml_test_os/ohos/har/" desc="ohos打包文件，不影响兼容性"/>
-                <filteritem type="filepath" name="ohos/lz_petitparser_test_os/ohos/har/" desc="ohos打包文件，不影响兼容性"/>
+                <filteritem type="filename" name="*.podspec" desc="pod 库的规格说明书, 不影响兼容性"/>
                 <filteritem type="filepath" name="sqflite/ohos/hvigor/hvigor-wrapper.js" desc="hvigorw编译程序，不影响兼容性"/>
                 <filteritem type="filepath" name="sqflite/ohos/oh_modules/" desc="oh_modules编译程序，不影响兼容性"/>
                 <filteritem type="filepath" name="sqflite/tripartite/sqflite_common/doc/" desc="说明文件，不影响兼容性"/>
