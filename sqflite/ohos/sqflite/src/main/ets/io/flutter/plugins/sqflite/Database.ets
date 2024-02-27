@@ -219,6 +219,7 @@ export class Database {
     let results: Map<String, object> = new Map<String, Object>();
     let rows: Array<Array<Object>> = new Array<Array<Object>>();
     let columns: Array<string> | null = null;
+    let valuesType: Array<string> | null = null;
     let columnCount: number = 0;
 
     // resultSet是一个数据集合得游标，默认值想第-1个记录，有效的数据从0开始
@@ -227,14 +228,19 @@ export class Database {
         columnCount = resultSet.columnCount;
         columns = new Array<string>();
         rows = new Array<Array<Object>>();
+        valuesType = new Array<string>();
+        let data: Record<string, ValueType> = resultSet.getRow() as Record<string, ValueType>;
         for(let i = 0; i < columnCount; i++) {
-          columns.push(resultSet.getColumnName(i));
+          let columnName = resultSet.getColumnName(i);
+          columns.push(columnName);
+          let type: string = typeof data[columnName];
+          valuesType!.push(type);
         }
         results.set(Constant.PARAM_COLUMNS, columns);
         results.set(Constant.PARAM_ROWS, rows);
       }
 
-      let row = Database.cursorRowToList(resultSet, columnCount);
+      let row = Database.cursorRowToList(resultSet, columnCount, valuesType!, columns!);
       rows.push(row);
       if(cursorPageSize != null) {
         if(rows.length >= cursorPageSize) {
@@ -249,29 +255,27 @@ export class Database {
     return true;
   }
   
-  static cursorRowToList(cursor: relationalStore.ResultSet, length: number): Array<Object> {
+  static cursorRowToList(cursor: relationalStore.ResultSet, length: number, valuesType: Array<string>, keys:  Array<string>): Array<Object> {
     let list = new Array<Object>();
 
     for(let i = 0; i < length; i++) {
-      let value: Object = Database.cursorValue(cursor, i);
-      // let value: Object = 'cursorValue(cursor, i);'
-      // if(Debug.EXTRA_LOGV) {
-      // String type = null;
-      // if(value != null) {
-      // if(value.getClass().isArray()) {
-      // type = "array(" + value.getClass().GetComponentType().getName() + ")";
-      // } else {
-      //    type = value.getClass().getName();
-      // }
-      // }
-      // Log.d(TAG, "column " + i + "" + cursor.getType(i) + ": " + value + (type == null ? "" : "(" + type + ")"));
-      // }
+      let value: Object = Database.cursorValue(cursor, i, valuesType, keys);
       list.push(value);
     }
     return list;
   }
 
-  static cursorValue(cursor: relationalStore.ResultSet, index: number): string {
+  static cursorValue(cursor: relationalStore.ResultSet, index: number, valuesType: Array<string>, keys:  Array<string>): Object {
+    if (valuesType.length >= index) {
+      let type: string = valuesType[index];
+      if (type === 'number') {
+        return cursor.getDouble(cursor.getColumnIndex(keys[index]));
+      }else if (type === 'string') {
+        return cursor.getString(cursor.getColumnIndex(keys[index]));
+      }else if (type === 'Uint8Array') {
+        return cursor.getBlob(cursor.getColumnIndex(keys[index]));
+      }
+    }
     return cursor.getString(index);
   }
 
