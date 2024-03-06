@@ -48,12 +48,12 @@ dependencies:
     sdk: flutter
   # sqflite_common: '>=2.4.5-3 <4.0.0'
   path: '>=1.8.0 <3.0.0'
+  sqflite_common:
+    git:
+      url: "https://gitee.com/openharmony-sig/flutter_sqflite.git"
+      path: "sqflite/tripartite/sqflite_common"
   # sqflite_ohos:
   #   path: sqflite_ohos
-
-dependency_overrides:
-  sqflite_common:
-    path: tripartite/sqflite_common
     
 dev_dependencies:
   flutter_lints: '>=1.0.0'
