@@ -50,7 +50,7 @@ dependencies:
   path: '>=1.8.0 <3.0.0'
   sqflite_common:
     git:
-      url: "https://gitee.com/simplelove520/flutter_sqflite"
+      url: "https://gitee.com/openharmony-sig/flutter_sqflite.git"
       path: "sqflite_common"
   # sqflite_ohos:
   #   path: sqflite_ohos
