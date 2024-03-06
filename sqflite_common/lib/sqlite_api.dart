@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:sqflite_common/sql.dart' show ConflictAlgorithm;
 import 'package:sqflite_common/src/database.dart';
@@ -54,12 +53,6 @@ abstract class DatabaseFactory {
 
   /// Check if a database exists
   Future<bool> databaseExists(String path);
-
-  /// Write database bytes.
-  Future<void> writeDatabaseBytes(String path, Uint8List bytes);
-
-  /// Read database bytes.
-  Future<Uint8List> readDatabaseBytes(String path);
 }
 
 ///

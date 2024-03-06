@@ -44,12 +44,6 @@ const String methodDatabaseExists = 'databaseExists';
 /// Native database delete method.
 const String methodDeleteDatabase = 'deleteDatabase';
 
-/// Native write database bytes method.
-const String methodWriteDatabaseBytes = 'writeDatabaseBytes';
-
-/// Native read database bytes method.
-const String methodReadDatabaseBytes = 'readDatabaseBytes';
-
 /// Native batch operations parameter.
 const String paramOperations = 'operations';
 
@@ -97,9 +91,6 @@ const String paramRecoveredInTransaction = 'recoveredInTransaction';
 
 /// The database path (string).
 const String paramPath = 'path';
-
-/// Bytes content.
-const String paramBytes = 'bytes';
 
 /// The database version (int).
 const String paramVersion = 'version';

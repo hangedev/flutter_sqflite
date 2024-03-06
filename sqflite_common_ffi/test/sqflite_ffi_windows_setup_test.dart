@@ -2,13 +2,17 @@
 import 'dart:io';
 
 import 'package:archive/archive_io.dart';
+import 'package:http/http.dart';
 import 'package:path/path.dart';
 import 'package:process_run/shell.dart';
 import 'package:sqflite_common_ffi/src/windows/setup.dart';
-import 'package:sqflite_common_ffi/src/windows/sqlite3_info.dart';
 import 'package:test/test.dart';
 
-import '../tool/windows_setup.dart';
+var windowsSqliteVersion = '3.38.2';
+var windowsZipSrc =
+    'https://www.sqlite.org/2022/sqlite-dll-win64-x64-3380200.zip';
+var windowsZipSha3 =
+    '9f71eec9a2c7f12602eaa2af76bd7c052e540502ae7a89dac540e10962e2fa35';
 
 Future<String> computeSha3(String file, {String openssl = 'openssl'}) async {
   var line = (await run(
@@ -41,9 +45,21 @@ Future<String?> windowsFindOpenssl() async {
 }
 
 void main() {
-  var helper = Sqlite3DllSetupHelper(sqlite3Info);
-  var srcZip = sqlite3Info.srcZip;
-  var localZip = join('.local', basename(srcZip));
+  var localZip = join('.local', basename(windowsZipSrc));
+  Future<bool> getZip() async {
+    if (!File(localZip).existsSync()) {
+      await Directory(dirname(localZip)).create(recursive: true);
+      try {
+        await File(localZip)
+            .writeAsBytes(await readBytes(Uri.parse(windowsZipSrc)));
+      } catch (e) {
+        stderr.writeln(
+            'Fail to fetch sqlite.zip version $windowsSqliteVersion at $windowsZipSrc');
+        return false;
+      }
+    }
+    return true;
+  }
 
   group('sqlite3.dll', () {
     test('sha3', () async {
@@ -53,16 +69,16 @@ void main() {
         openssl = await windowsFindOpenssl();
       }
       if (openssl != null) {
-        if (await helper.getZip()) {
+        if (await getZip()) {
           var computed = await computeSha3(localZip, openssl: openssl);
-          expect(computed, sqlite3Info.sha3);
+          expect(computed, windowsZipSha3);
         }
       }
     });
 
     test('checkDll', () async {
       var dllPath = findWindowsDllPath()!;
-      if (await helper.getZip()) {
+      if (await getZip()) {
         final inputStream = InputFileStream(localZip);
         final archive = ZipDecoder().decodeBuffer(inputStream);
         extractArchiveToDisk(archive, dirname(localZip));

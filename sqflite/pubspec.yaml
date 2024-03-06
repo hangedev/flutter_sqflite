@@ -51,7 +51,7 @@ dependencies:
   sqflite_common:
     git:
       url: "https://gitee.com/openharmony-sig/flutter_sqflite.git"
-      path: "sqflite/tripartite/sqflite_common"
+      path: "sqflite_common"
   # sqflite_ohos:
   #   path: sqflite_ohos
     

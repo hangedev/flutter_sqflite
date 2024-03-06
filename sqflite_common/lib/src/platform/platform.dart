@@ -1,5 +1,3 @@
-import 'package:sqflite_common/src/database_file_system.dart';
-
 export 'platform_io.dart' if (dart.library.js) 'platform_web.dart';
 
 /// IO/web support
@@ -21,7 +19,4 @@ abstract class Platform {
 
   /// True if IO MacOS
   bool get isMacOS => false;
-
-  /// Database file system.
-  DatabaseFileSystem get databaseFileSystem;
 }

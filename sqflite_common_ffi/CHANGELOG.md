@@ -1,8 +1,3 @@
-## 2.3.0+2
-
-* Dart 3 only.
-* Bundle Windows sqlite3.dll 3.42.0
-
 ## 2.2.5
 
 * Export global sqflite API

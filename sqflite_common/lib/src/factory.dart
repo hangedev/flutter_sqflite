@@ -27,11 +27,9 @@ abstract class SqfliteDatabaseFactory
   /// db.close() calls this right await.
   Future<void> closeDatabase(SqfliteDatabase database);
 
-  /// Delete the database file.
   @override
   Future<void> deleteDatabase(String path);
 
-  /// Check if a database exists.
   @override
   Future<bool> databaseExists(String path);
 }
