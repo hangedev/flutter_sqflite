@@ -40,7 +40,7 @@ export abstract class BaseReadOperation implements Operation {
     return new SqlCommand(this.getSql(), this.getSqlArguments());
   }
 
-  public getInTransactionChange(): Boolean {
+  public getInTransactionChange(): boolean {
     return this.getBoolean(Constant.PARAM_IN_TRANSACTION_CHANGE);
   }
 
@@ -60,9 +60,9 @@ export abstract class BaseReadOperation implements Operation {
     return false;
   }
 
-  private getBoolean(key: string): Boolean {
+  private getBoolean(key: string): boolean {
     let value: object = this.getArgument(key);
-    if(value instanceof Boolean) {
+    if(typeof value == 'boolean') {
       return value;
     }
     return false;

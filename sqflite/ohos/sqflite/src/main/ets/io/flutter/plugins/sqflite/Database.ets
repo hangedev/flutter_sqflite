@@ -61,7 +61,7 @@ export class Database {
 
   private static async executeOrError(operation: Operation, db: relationalStore.RdbStore, callback?: HandleCallback): Promise<boolean> {
     let command: SqlCommand = operation.getSqlCommand();
-    let operationInTransaction: Boolean = operation.getInTransactionChange();
+    let operationInTransaction: boolean = operation.getInTransactionChange();
     let sqlArguments: ValueType[] | undefined = operation.getArgument(Constant.PARAM_SQL_ARGUMENTS);
     let sql: string = command.getSql();
     let promise: ValueType;
@@ -88,26 +88,37 @@ export class Database {
   public static async execute(operation: Operation, db: relationalStore.RdbStore): Promise<void> {
     let command: SqlCommand = operation.getSqlCommand();
     let sql: string = command.getSql();
-    if(sql == 'BEGIN IMMEDIATE') {
-      db.beginTransaction();
-      operation.success(null);
-      return;
-    } else if(sql == 'COMMIT') {
-      db.commit();
-      operation.success(null);
-      return;
-    } else if (sql == 'BEGIN EXCLUSIVE') {
-      operation.success(null);
-      return;
-    }
-
-    let inTransactionChange: Boolean = operation.getInTransactionChange();
+    let executeSuccess: boolean = false;
+    let inTransactionChange: boolean = operation.getInTransactionChange();
     let enteringTransaction: boolean = (inTransactionChange == true && operation.hasNullTransactionId());
     if(enteringTransaction) {
       Database.currentTransactionId = ++ (Database.lastTransactionId);
     }
 
-    let executeSuccess: boolean = await Database.executeOrError(operation, db);
+    if(sql == 'BEGIN IMMEDIATE') {
+      db.beginTransaction();
+      Database.enterOrLeaveInTransaction(inTransactionChange);
+      executeSuccess = true;
+      Database.handleExecute(executeSuccess, enteringTransaction, operation, inTransactionChange);
+      return;
+    } else if(sql == 'COMMIT') {
+      db.commit();
+      Database.enterOrLeaveInTransaction(inTransactionChange);
+      executeSuccess = true;
+      Database.handleExecute(executeSuccess, enteringTransaction, operation, inTransactionChange);
+      return;
+    } else if (sql == 'BEGIN EXCLUSIVE') {
+      Database.enterOrLeaveInTransaction(inTransactionChange);
+      executeSuccess = true;
+      Database.handleExecute(executeSuccess, enteringTransaction, operation, inTransactionChange);
+      return;
+    }
+
+    executeSuccess = await Database.executeOrError(operation, db);
+    Database.handleExecute(executeSuccess, enteringTransaction, operation, inTransactionChange);
+  }
+
+  private static handleExecute(executeSuccess: boolean, enteringTransaction: boolean, operation: Operation, inTransactionChange: Boolean) {
     if(!executeSuccess) {
       // Revert if needed
       if(enteringTransaction) {
