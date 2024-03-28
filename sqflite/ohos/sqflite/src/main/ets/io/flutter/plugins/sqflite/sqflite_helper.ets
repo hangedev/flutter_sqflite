@@ -773,7 +773,6 @@ export class SqfLiteHelper {
     if (dataBase == null) return success;
     try {
       let predicates = new relationalStore.RdbPredicates(tableName);
-      predicates.isNull('id');
       let result = await dataBase.query(predicates);
       if (result.columnCount > 0) {
         Log.i(TAG, '检查表' + tableName + '已存在', '%{public}s');
