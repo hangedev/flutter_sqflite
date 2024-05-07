@@ -13,13 +13,13 @@
  * limitations under the License.
  */
 {
-  "name": "sqflite",
-  "version": "1.0.0",
-  "description": "Please describe the basic information.",
-  "main": "index.ets",
-  "author": "",
-  "license": "Apache-2.0",
-  "dependencies": {
-    "@ohos/flutter_ohos": "file:libs/flutter.har",
+  "module": {
+    "name": "sqflite",
+    "type": "har",
+    "deviceTypes": [
+      "default",
+      "tablet",
+      "2in1"
+    ]
   }
 }
