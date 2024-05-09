@@ -78,9 +78,10 @@
                 <filteritem type="filepath" name="sqflite/ohos/hvigor/hvigor-wrapper.js" desc="hvigorw编译程序，不影响兼容性"/>
                 <filteritem type="filepath" name="sqflite/ohos/oh_modules/" desc="oh_modules编译程序，不影响兼容性"/>
                 <filteritem type="filepath" name="sqflite/tripartite/sqflite_common/doc/" desc="说明文件，不影响兼容性"/>
-                
+                <filteritem type="filepath" name="sqflite/example/ohos/hvigor/hvigor-wrapper.js" desc="hvigorw编译程序，不影响兼容性"/>
             </filefilter>
             <filefilter name="defaultPolicyFilter" desc="Filters for compatibility，license header policies">
+                <filteritem type="filepath" name="sqflite/example/ohos/hvigor/hvigor-wrapper.js" desc="hvigorw编译程序，不影响兼容性"/>
             </filefilter>
             <filefilter name="copyrightPolicyFilter" desc="Filters for copyright header policies">
             </filefilter>
