@@ -24,6 +24,7 @@ import { MethodResult } from '@ohos/flutter_ohos/src/main/ets/plugin/common/Meth
 import MethodCall from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodCall';
 import { MethodCallOperation } from './operation/MethodCallOperation';
 import { BatchOperation } from './operation/BatchOperation';
+import { Any } from '@ohos/flutter_ohos';
 
 export class Database {
   public context: common.Context;
@@ -233,8 +234,12 @@ export class Database {
         for(let i = 0; i < columnCount; i++) {
           let columnName = resultSet.getColumnName(i);
           columns.push(columnName);
-          let type: string = typeof data[columnName];
-          valuesType!.push(type);
+          if (data[columnName] != null) {
+            let type: string = typeof data[columnName];
+            valuesType!.push(type);
+          }else {
+            valuesType!.push("null");
+          }
         }
         results.set(Constant.PARAM_COLUMNS, columns);
         results.set(Constant.PARAM_ROWS, rows);
@@ -265,7 +270,7 @@ export class Database {
     return list;
   }
 
-  static cursorValue(cursor: relationalStore.ResultSet, index: number, valuesType: Array<string>, keys:  Array<string>): Object {
+  static cursorValue(cursor: relationalStore.ResultSet, index: number, valuesType: Array<string>, keys:  Array<string>): Any {
     if (valuesType.length >= index) {
       let type: string = valuesType[index];
       if (type === 'number') {
@@ -274,6 +279,8 @@ export class Database {
         return cursor.getString(cursor.getColumnIndex(keys[index]));
       }else if (type === 'Uint8Array') {
         return cursor.getBlob(cursor.getColumnIndex(keys[index]));
+      }else if (type === 'null') {
+        return null;
       }
     }
     return cursor.getString(index);
