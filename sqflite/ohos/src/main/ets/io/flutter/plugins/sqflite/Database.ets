@@ -22,9 +22,12 @@ import { Constant } from './Constant';
 import { BusinessError } from '@ohos.base';
 import { MethodResult } from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodChannel';
 import MethodCall from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodCall';
+import Log from '@ohos/flutter_ohos/src/main/ets/util/Log';
 import { MethodCallOperation } from './operation/MethodCallOperation';
 import { BatchOperation } from './operation/BatchOperation';
 import { Any } from '@ohos/flutter_ohos';
+
+type HandleCallback = (x: Object) => void;
 
 export class Database {
   public context: common.Context;
@@ -57,19 +60,24 @@ export class Database {
     operation.error(Constant.SQLITE_ERROR, message + '' + code, '');
   }
 
-  private static async executeOrError(operation: Operation, db: relationalStore.RdbStore): Promise<boolean> {
+  private static async executeOrError(operation: Operation, db: relationalStore.RdbStore, callback?: HandleCallback): Promise<boolean> {
     let command: SqlCommand = operation.getSqlCommand();
-    let operationInTransaction: Boolean = operation.getInTransactionChange();
+    let operationInTransaction: boolean = operation.getInTransactionChange();
     let sqlArguments: ValueType[] | undefined = operation.getArgument(Constant.PARAM_SQL_ARGUMENTS);
     let sql: string = command.getSql();
+    let promise: ValueType;
     try{
       if(sqlArguments == undefined || sqlArguments.length < 1) {
-        let promise = await db.executeSql(sql);
+        promise = await db.execute(sql) as ValueType;
       } else {
-        let promise = await db.executeSql(sql, sqlArguments);
+        promise = await db.execute(sql, sqlArguments) as ValueType;
       }
+      Log.i("Tag", "返回来的值:" + promise);
 
       Database.enterOrLeaveInTransaction(operationInTransaction);
+      if (callback != undefined) {
+        callback(promise)
+      }
       return true;
     } catch(err) {
       Database.handleException(operation, err);
@@ -81,26 +89,37 @@ export class Database {
   public static async execute(operation: Operation, db: relationalStore.RdbStore): Promise<void> {
     let command: SqlCommand = operation.getSqlCommand();
     let sql: string = command.getSql();
-    if(sql == 'BEGIN IMMEDIATE') {
-      db.beginTransaction();
-      operation.success(null);
-      return;
-    } else if(sql == 'COMMIT') {
-      db.commit();
-      operation.success(null);
-      return;
-    } else if (sql == 'BEGIN EXCLUSIVE') {
-      operation.success(null);
-      return;
-    }
-
-    let inTransactionChange: Boolean = operation.getInTransactionChange();
+    let executeSuccess: boolean = false;
+    let inTransactionChange: boolean = operation.getInTransactionChange();
     let enteringTransaction: boolean = (inTransactionChange == true && operation.hasNullTransactionId());
     if(enteringTransaction) {
       Database.currentTransactionId = ++ (Database.lastTransactionId);
     }
 
-    let executeSuccess: boolean = await Database.executeOrError(operation, db);
+    if(sql == 'BEGIN IMMEDIATE') {
+      db.beginTransaction();
+      Database.enterOrLeaveInTransaction(inTransactionChange);
+      executeSuccess = true;
+      Database.handleExecute(executeSuccess, enteringTransaction, operation, inTransactionChange);
+      return;
+    } else if(sql == 'COMMIT') {
+      db.commit();
+      Database.enterOrLeaveInTransaction(inTransactionChange);
+      executeSuccess = true;
+      Database.handleExecute(executeSuccess, enteringTransaction, operation, inTransactionChange);
+      return;
+    } else if (sql == 'BEGIN EXCLUSIVE') {
+      Database.enterOrLeaveInTransaction(inTransactionChange);
+      executeSuccess = true;
+      Database.handleExecute(executeSuccess, enteringTransaction, operation, inTransactionChange);
+      return;
+    }
+
+    executeSuccess = await Database.executeOrError(operation, db);
+    Database.handleExecute(executeSuccess, enteringTransaction, operation, inTransactionChange);
+  }
+
+  private static handleExecute(executeSuccess: boolean, enteringTransaction: boolean, operation: Operation, inTransactionChange: Boolean) {
     if(!executeSuccess) {
       // Revert if needed
       if(enteringTransaction) {
@@ -138,7 +157,9 @@ export class Database {
   }
 
   private static async doInsert(operation: Operation, db: relationalStore.RdbStore): Promise<boolean> {
-    let executeSuccess: boolean = await Database.executeOrError(operation, db);
+    let executeSuccess: boolean = await Database.executeOrError(operation, db, (rowId) => {
+      operation.success(rowId);
+    });
     if(!executeSuccess) {
       return false;
     }
@@ -148,7 +169,6 @@ export class Database {
       operation.success(null);
       return true;
     }
-    operation.success(1);
     return true;
   }
 
@@ -158,7 +178,9 @@ export class Database {
   }
 
   private static async doUpdate(operation: Operation, db: relationalStore.RdbStore): Promise<boolean> {
-    let executeSuccess: boolean = await Database.executeOrError(operation, db);
+    let executeSuccess: boolean = await Database.executeOrError(operation, db, (rows) => {
+      operation.success(rows);
+    });
     if(!executeSuccess) {
       return false;
     }
@@ -168,7 +190,6 @@ export class Database {
       operation.success(null);
       return true;
     }
-    operation.success(1);
     return true;
   }
 
