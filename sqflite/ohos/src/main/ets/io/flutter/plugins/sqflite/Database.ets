@@ -241,7 +241,6 @@ export class Database {
     let results: Map<String, object> = new Map<String, Object>();
     let rows: Array<Array<Object>> = new Array<Array<Object>>();
     let columns: Array<string> | null = null;
-    let valuesType: Array<string> | null = null;
     let columnCount: number = 0;
 
     // resultSet是一个数据集合得游标，默认值想第-1个记录，有效的数据从0开始
@@ -250,23 +249,16 @@ export class Database {
         columnCount = resultSet.columnCount;
         columns = new Array<string>();
         rows = new Array<Array<Object>>();
-        valuesType = new Array<string>();
         let data: Record<string, ValueType> = resultSet.getRow() as Record<string, ValueType>;
         for(let i = 0; i < columnCount; i++) {
           let columnName = resultSet.getColumnName(i);
           columns.push(columnName);
-          if (data[columnName] != null) {
-            let type: string = typeof data[columnName];
-            valuesType!.push(type);
-          }else {
-            valuesType!.push("null");
-          }
         }
         results.set(Constant.PARAM_COLUMNS, columns);
         results.set(Constant.PARAM_ROWS, rows);
       }
 
-      let row = Database.cursorRowToList(resultSet, columnCount, valuesType!, columns!);
+      let row = Database.cursorRowToList(resultSet, columnCount);
       rows.push(row);
       if(cursorPageSize != null) {
         if(rows.length >= cursorPageSize) {
@@ -281,30 +273,18 @@ export class Database {
     return true;
   }
   
-  static cursorRowToList(cursor: relationalStore.ResultSet, length: number, valuesType: Array<string>, keys:  Array<string>): Array<Object> {
+  static cursorRowToList(cursor: relationalStore.ResultSet, length: number): Array<Object> {
     let list = new Array<Object>();
 
     for(let i = 0; i < length; i++) {
-      let value: Object = Database.cursorValue(cursor, i, valuesType, keys);
+      let value: Object = Database.cursorValue(cursor, i);
       list.push(value);
     }
     return list;
   }
 
-  static cursorValue(cursor: relationalStore.ResultSet, index: number, valuesType: Array<string>, keys:  Array<string>): Any {
-    if (valuesType.length >= index) {
-      let type: string = valuesType[index];
-      if (type === 'number') {
-        return cursor.getDouble(cursor.getColumnIndex(keys[index]));
-      }else if (type === 'string') {
-        return cursor.getString(cursor.getColumnIndex(keys[index]));
-      }else if (type === 'Uint8Array') {
-        return cursor.getBlob(cursor.getColumnIndex(keys[index]));
-      }else if (type === 'null') {
-        return null;
-      }
-    }
-    return cursor.getString(index);
+  static cursorValue(cursor: relationalStore.ResultSet, index: number): Any {
+    return cursor.getValue(index);
   }
 
   /// batch
