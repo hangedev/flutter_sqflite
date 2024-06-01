@@ -18,7 +18,7 @@ import relationalStore from '@ohos.data.relationalStore';
 import { Operation } from './operation/Operation';
 import { SqlCommand } from './SqlCommand';
 import { ValueType } from '@ohos.data.ValuesBucket';
-import { Constant } from './HWConstant';
+import { Constant } from './OhosConstant';
 import { BusinessError } from '@ohos.base';
 import { MethodResult } from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodChannel';
 import MethodCall from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodCall';

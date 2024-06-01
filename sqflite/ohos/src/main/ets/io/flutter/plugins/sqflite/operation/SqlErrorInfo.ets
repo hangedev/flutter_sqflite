@@ -13,7 +13,7 @@
 * limitations under the License.
 */
 
-import { Constant } from '../HWConstant';
+import { Constant } from '../OhosConstant';
 import { SqlCommand } from '../SqlCommand';
 import { Operation } from './Operation';
 
