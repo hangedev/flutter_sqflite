@@ -14,7 +14,7 @@
 */
 
 import { MethodResult } from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodChannel';
-import { Constant } from '../Constant';
+import { Constant } from '../HWConstant';
 import { BaseOperation } from './BaseOperation';
 import { OperationResult } from './OperationResult';
 

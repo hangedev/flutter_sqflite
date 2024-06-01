@@ -22,7 +22,7 @@ import MethodChannel, {
 } from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodChannel';
 import { Tools } from './tools';
 import { BusinessError } from '@ohos.base';
-import { Constant } from './Constant';
+import { Constant } from './HWConstant';
 import deviceInfo from '@ohos.deviceInfo';
 import { ValueType } from '@ohos.data.ValuesBucket';
 import { SqlHelper } from './sql_helper';
