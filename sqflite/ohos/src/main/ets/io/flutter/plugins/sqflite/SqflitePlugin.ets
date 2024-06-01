@@ -33,7 +33,7 @@ import { SqfLiteHelper } from './sqflite_helper';
 import relationalStore from '@ohos.data.relationalStore';
 import { ValueType } from '@ohos.data.ValuesBucket';
 import { SqlHelper } from './sql_helper';
-import { Constant } from './Constant';
+import { Constant } from './OhosConstant';
 import MethodCall from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodCall';
 import { Database } from './Database';
 import { MethodCallOperation } from './operation/MethodCallOperation';
