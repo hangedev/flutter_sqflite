@@ -90,9 +90,9 @@ export class SqlHelper {
     let firstMatch:number = jsonStr.search('UPDATE');
     let pattern: RegExp;
     if (firstMatch >= 0) {
-      pattern = new RegExp('UPDATE\\s+(\\w+)');
+      pattern = new RegExp('(\\w+)\\s+SET', 'i');
     }else {
-      pattern = new RegExp('DELETE FROM\\s+(\\w+)');
+      pattern = new RegExp('\\s+FROM\\s+(\\w+)', 'i');
     }
 
     let match = pattern.exec(jsonStr);
