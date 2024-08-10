@@ -14,8 +14,8 @@
  */
 
 import { FlutterEngine, Log } from '@ohos/flutter_ohos';
-import IntegrationTestPlugin from 'integration_test';
 import SqflitePlugin from 'sqflite';
+import SqfliteHelperPlugin from 'sqflite_helper';
 
 /**
  * Generated file. Do not edit.
@@ -29,8 +29,8 @@ export class GeneratedPluginRegistrant {
 
   static registerWith(flutterEngine: FlutterEngine) {
     try {
-      flutterEngine.getPlugins()?.add(new IntegrationTestPlugin());
       flutterEngine.getPlugins()?.add(new SqflitePlugin());
+      flutterEngine.getPlugins()?.add(new SqfliteHelperPlugin());
     } catch (e) {
       Log.e(
         TAG,
