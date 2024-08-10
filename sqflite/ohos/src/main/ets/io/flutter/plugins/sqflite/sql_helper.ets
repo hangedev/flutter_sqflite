@@ -40,14 +40,7 @@ export class SqlHelper {
   /// 分离sql的表名部分
   public static getInsertSqlTableName(jsonStr: string): string {
     // 提取表名
-    let firstMatch: number = jsonStr.search('INSERT OR REPLACE INTO');
-    let pattern: RegExp;
-    if (firstMatch >= 0) {
-      pattern = new RegExp('INSERT OR REPLACE INTO (\\w+) \\(([^()]+)\\)');
-    }else {
-      pattern = new RegExp('INSERT INTO (\\w+)');
-    }
-    // let pattern = new RegExp('INSERT INTO (\\w+) \\(([^()]+)\\)');
+    let pattern = new RegExp('\\s+INTO\\s+(\\w+)', 'i');
     const propertiesMatch = pattern.exec(jsonStr);
     const propertiesStr = propertiesMatch ? propertiesMatch[1] : ''; // 提取属性部分的字符串
     return propertiesStr;

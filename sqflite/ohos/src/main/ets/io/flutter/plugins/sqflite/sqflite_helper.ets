@@ -50,8 +50,9 @@ export class SqfLiteHelper {
   private static operationError: OperationError;
 
   /// 创建一个数据库
-  public static async getDataBase(context: common.Context, dbPath: string, result: MethodResult): Promise<number> {
+  public static async getDataBase(context: common.Context, call: MethodCall, result: MethodResult): Promise<number> {
     let id: number = -1;
+    let dbPath: string = call.argument(Constant.PARAM_PATH);
     let dbPathNameList: string[] = dbPath.split('/');
     let dbName: string = dbPathNameList[dbPathNameList.length - 1];
     let endWithDb: boolean = Tools.stringEndWith(dbName, '.db');
@@ -96,16 +97,19 @@ export class SqfLiteHelper {
 
     // 从系统中获取
     let config: relationalStore.StoreConfig;
+    let readOnly:boolean = call.argument(Constant.PARAM_READ_ONLY) == undefined ? false : call.argument(Constant.PARAM_READ_ONLY);
     if (customDir.length > 0) {
       config = {
         name: dbName, // 数据库文件名
         securityLevel: relationalStore.SecurityLevel.S1, // 数据库安全级别
         customDir: customDir,
+        // isReadOnly:readOnly
       };
     } else {
       config = {
         name: dbName, // 数据库文件名
         securityLevel: relationalStore.SecurityLevel.S1, // 数据库安全级别
+        // isReadOnly:readOnly
       }
     }
 

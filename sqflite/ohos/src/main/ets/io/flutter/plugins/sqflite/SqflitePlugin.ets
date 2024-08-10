@@ -151,8 +151,7 @@ export default class SqflitePlugin extends SqfliteApi implements FlutterPlugin, 
   //----------begin
   ///打开数据库
   async handleOpenDatabaseCall(call: MethodCall, result: MethodResult): Promise<void> {
-    let daPath: string = call.argument(Constant.PARAM_PATH);
-    await SqfLiteHelper.getDataBase(this.context!, daPath, result);
+    await SqfLiteHelper.getDataBase(this.context!, call, result);
   }
 
   ///获取数据库路径

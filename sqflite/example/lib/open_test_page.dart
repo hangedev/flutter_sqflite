@@ -222,6 +222,7 @@ class OpenTestPage extends TestPage {
     test('Simple onCreate', () async {
       // await Sqflite.devSetDebugModeOn(true);
       final path = await initDeleteDb('open_simple_on_create.db');
+      //这里有问题， 要用到readonly接口才能解决
       expect(await isDatabase(path), isFalse);
 
       final db = await openDatabase(path, version: 1, onCreate: (db, version) async {
@@ -330,16 +331,21 @@ class OpenTestPage extends TestPage {
 
       // Make sure the parent directory exists
       try {
+        //这里有问题，创建出来的文件位置不对，没有在rdb文件里面
         await createDirectory(path);
-      } catch (_) {}
+      } catch (_) {
+        print("创建出错");
+      }
 
       // Copy from asset
       final data = await rootBundle.load(join('assets', 'example.db'));
+      print("获取本地数据库:$data");
       final List<int> bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
       // Write and flush the bytes written
       await writeFileAsBytes(path, bytes, flush: true);
 
       // open the database
+      //这里有问题，因为创建出来的文件位置不对，导致打开错误
       final db = await openDatabase(path);
 
       // Our database as a single table with a single element
@@ -534,9 +540,9 @@ class OpenTestPage extends TestPage {
 
       db = await openReadOnlyDatabase(path);
       expect(Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM Test')), 1);
-
+      //这里有问题，要用到readonly接口才能解决 ,使用了readonly接口，也能进行插入操作
       try {
-        await db.rawInsert('INSERT INTO Test(value) VALUES(?)', ['value1']);
+         await db.rawInsert('INSERT INTO Test(value) VALUES(?)', ['value1']);
         fail('should fail');
       } on DatabaseException catch (e) {
         // Error DatabaseException(attempt to write a readonly database (code 8)) running Open read-only
@@ -677,6 +683,7 @@ class OpenTestPage extends TestPage {
 
       var db = await openDatabase(path);
       await db.execute('CREATE TABLE IF NOT EXISTS Test(id INTEGER PRIMARY KEY)');
+      //这里有问题，要兼容In memory database
       await db.insert('Test', {'id': 1});
       expect(await db.query('Test'), [
         {'id': 1}
@@ -835,6 +842,7 @@ class OpenTestPage extends TestPage {
         expect(await readFileAsString(path), 'dummy');
       }
 
+      //这里有问题，要用到readonly接口才能解决
       expect(await isDatabase(path), isFalse);
       // try read-write
       const minExpectedSize = 1000;
