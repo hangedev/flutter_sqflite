@@ -103,13 +103,13 @@ export class SqfLiteHelper {
         name: dbName, // 数据库文件名
         securityLevel: relationalStore.SecurityLevel.S1, // 数据库安全级别
         customDir: customDir,
-        // isReadOnly:readOnly
+        isReadOnly:readOnly
       };
     } else {
       config = {
         name: dbName, // 数据库文件名
         securityLevel: relationalStore.SecurityLevel.S1, // 数据库安全级别
-        // isReadOnly:readOnly
+        isReadOnly:readOnly
       }
     }
 
@@ -215,11 +215,15 @@ export class SqfLiteHelper {
   }
 
   /// 关闭一个数据库
-  public static closeDataBase(call: MethodCall, result: MethodResult): void {
+  public static async closeDataBase(call: MethodCall, result: MethodResult): Promise<void> {
     let databaseId: number = call.argument(Constant.PARAM_ID);
     let dataBaseName: string | undefined = SqfLiteHelper.dBIdList.get(databaseId);
     if (dataBaseName == undefined) return;
     if (SqfLiteHelper.dataBaseList.has(dataBaseName)) {
+      let local: relationalStore.RdbStore | null = SqfLiteHelper.getOnlyLocal(dataBaseName);
+      if (local != null) {
+        await local.close();
+      }
       SqfLiteHelper.dataBaseList.delete(dataBaseName);
       let id: number = -1;
       SqfLiteHelper.dBIdList.forEach((value, key) => {

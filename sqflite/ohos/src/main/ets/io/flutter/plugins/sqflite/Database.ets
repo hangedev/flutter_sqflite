@@ -57,7 +57,10 @@ export class Database {
   private static handleException(operation: Operation, err: BusinessError<void>) {
     let code = err.code;
     let message = err.message;
-    operation.error(Constant.SQLITE_ERROR, message + '' + code, '');
+    if (code == 801) {
+      message = message + " Database is readonly"
+    }
+    operation.error(Constant.SQLITE_ERROR, 'error code:' + code + '。' + message, '');
   }
 
   private static async executeOrError(operation: Operation, db: relationalStore.RdbStore, callback?: HandleCallback): Promise<boolean> {
