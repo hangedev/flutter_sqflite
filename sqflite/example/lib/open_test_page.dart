@@ -621,6 +621,7 @@ class OpenTestPage extends TestPage {
           // Copy from asset
           final data = await rootBundle.load(join('assets', 'example.db'));
           final bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+          //这里有问题，无法正确写进去
           await writeFileAsBytes(path, bytes);
 
           // open the database
@@ -827,6 +828,7 @@ class OpenTestPage extends TestPage {
       {
         late Database db;
         try {
+          //这里有问题,14800030
           db = await factory.openDatabase(path, options: OpenDatabaseOptions(readOnly: true));
         } catch (e) {
           print('open error');
@@ -842,7 +844,7 @@ class OpenTestPage extends TestPage {
         expect(await readFileAsString(path), 'dummy');
       }
 
-      //这里有问题，要用到readonly接口才能解决
+      
       expect(await isDatabase(path), isFalse);
       // try read-write
       const minExpectedSize = 1000;

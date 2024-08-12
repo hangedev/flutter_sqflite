@@ -45,17 +45,15 @@ export abstract class BaseReadOperation implements Operation {
   }
 
   getNoResult(): boolean {
-    if(this.getArgument<object>(Constant.PARAM_NO_RESULT) instanceof Boolean) {
-      let result: boolean = this.getArgument(Constant.PARAM_NO_RESULT);
-      return result;
+    if(this.getArgument<object>(Constant.PARAM_NO_RESULT)) {
+      return true;
     }
     return false;
   }
 
   getContinueOnError(): boolean {
-    if(this.getArgument<object>(Constant.PARAM_CONTINUE_OR_ERROR) instanceof Boolean) {
-      let result: boolean = this.getArgument(Constant.PARAM_CONTINUE_OR_ERROR);
-      return result;
+    if(this.getArgument<object>(Constant.PARAM_CONTINUE_OR_ERROR)) {
+      return true;
     }
     return false;
   }
