@@ -276,7 +276,7 @@ export default class SqflitePlugin extends SqfliteApi implements FlutterPlugin, 
     if (rdbStore == null) {
       return;
     }
-    SqfLiteHelper.closeDataBase(call, result);
+    await SqfLiteHelper.closeDataBase(call, result);
 
   }
 
