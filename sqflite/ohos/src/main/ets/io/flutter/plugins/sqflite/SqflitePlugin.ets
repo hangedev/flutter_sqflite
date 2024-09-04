@@ -186,17 +186,6 @@ export default class SqflitePlugin extends SqfliteApi implements FlutterPlugin, 
       return;
     }
 
-    let sql: string = call.argument(Constant.PARAM_SQL);
-    let dataBaseId: number = call.argument(Constant.PARAM_ID);
-    let databaseName: string = SqfLiteHelper.dBIdList.get(dataBaseId) as string;
-    let tableName: string = SqlHelper.getInsertSqlTableName(sql);
-
-    let tableExisted = await SqfLiteHelper.checkTable(databaseName, tableName);
-    if(tableName.length > 0 && !tableExisted) {
-      result.error(Constant.SQLITE_ERROR, 'no such table:' + tableName, '');
-      return;
-    }
-
     let operation: MethodCallOperation = new MethodCallOperation(call, result);
     Database.insert(operation, rdbStore);
   }
@@ -209,17 +198,6 @@ export default class SqflitePlugin extends SqfliteApi implements FlutterPlugin, 
       return;
     }
 
-    let sql: string = call.argument(Constant.PARAM_SQL);
-    let dataBaseId: number = call.argument(Constant.PARAM_ID);
-    let databaseName: string = SqfLiteHelper.dBIdList.get(dataBaseId) as string;
-    let tableName: string = SqlHelper.getQuerySqlTableName(sql);
-
-    let tableExisted = await SqfLiteHelper.checkTable(databaseName, tableName);
-    if(tableName.length > 0 && !tableExisted) {
-      result.error(Constant.SQLITE_ERROR, 'no such table:' + tableName, '');
-      return;
-    }
-
     let operation: MethodCallOperation = new MethodCallOperation(call, result);
     Database.query(operation, rdbStore);
   }
@@ -228,17 +206,6 @@ export default class SqflitePlugin extends SqfliteApi implements FlutterPlugin, 
   async handleUpdateCall(call: MethodCall, result: MethodResult): Promise<void> {
     let rdbStore = SqfLiteHelper.getDatabaseOrError(call, result);
     if (rdbStore == null) {
-      return;
-    }
-
-    let sql: string = call.argument(Constant.PARAM_SQL);
-    let dataBaseId: number = call.argument(Constant.PARAM_ID);
-    let databaseName: string = SqfLiteHelper.dBIdList.get(dataBaseId) as string;
-    let tableName: string = SqlHelper.getUpdateSqlTableName(sql);
-
-    let tableExisted = await SqfLiteHelper.checkTable(databaseName, tableName);
-    if(tableName.length > 0 && !tableExisted) {
-      result.error(Constant.SQLITE_ERROR, 'no such table:' + tableName, '');
       return;
     }
 
