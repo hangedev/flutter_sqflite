@@ -22,7 +22,6 @@ import { Constant } from './OhosConstant';
 import { BusinessError } from '@ohos.base';
 import { MethodResult } from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodChannel';
 import MethodCall from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodCall';
-import Log from '@ohos/flutter_ohos/src/main/ets/util/Log';
 import { MethodCallOperation } from './operation/MethodCallOperation';
 import { BatchOperation } from './operation/BatchOperation';
 import { Any } from '@ohos/flutter_ohos';
@@ -45,7 +44,7 @@ export class Database {
     this.singleInstance = singleInstance;
     this.logLevel = logLevel;
   }
-  
+
   private static enterOrLeaveInTransaction(value: Boolean): void {
     if(value == true) {
       Database.transactionDepth++;
@@ -75,7 +74,6 @@ export class Database {
       } else {
         promise = await db.execute(sql, sqlArguments) as ValueType;
       }
-      Log.i("Tag", "返回来的值:" + promise);
 
       Database.enterOrLeaveInTransaction(operationInTransaction);
       if (callback != undefined) {
@@ -275,7 +273,7 @@ export class Database {
     resultSet.close();
     return true;
   }
-  
+
   static cursorRowToList(cursor: relationalStore.ResultSet, length: number): Array<Object> {
     let list = new Array<Object>();
 
