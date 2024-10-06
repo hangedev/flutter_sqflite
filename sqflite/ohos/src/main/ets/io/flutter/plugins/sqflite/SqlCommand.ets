@@ -28,46 +28,13 @@ export class SqlCommand {
     this.rawArguments = rawArguments;
   }
 
-
   // Handle list of int as byte[]
   static toValue(value: ValueType): ValueType {
-    // if(value == null) {
-    //   return null;
-    // } else {
-    //   // Assume a list is a blob
-    //   if(value instanceof Array) {
-    //     //  @SuppressWarnings("unchecked)
-    //     let list: Array<number> = value as Array<number>;
-    //     //  let blob;
-    //     Array<ByteBuffer> = new byte[list.length];
-    //     // for(let i = 0; i < list.length; i++) {
-    //       // blob[i] = list[i];
-    //     // }
-    //     // value = blob;
-    //   }
-    //   return value;
-    // }
     return value;
   }
 
   public getSql(): string {
     return this.sql;
-  }
-
-  private getSqlArgumentsPrivate(rawArguments: Array<ValueType>): Array<ValueType> {
-    let fixedArguments = new ArrayList<Object>();
-    if(rawArguments != null) {
-      for(let index = 0; index < rawArguments.length; index++) {
-        const element = rawArguments[index];
-        // fixedArguments.add(SqlCommand.toValue(element));
-      }
-    }
-    // return fixedArguments.toArray(mew Object[0]);
-    return new Array;
-  }
-
-  public getSqlArguments(): ValueType[] {
-    return this.getSqlArgumentsPrivate(this.rawArguments);
   }
 
   public getRawSqlArguments(): Array<Object> {

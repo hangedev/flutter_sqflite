@@ -21,7 +21,6 @@ export class Tools {
      for (let index = 0; index < endString.length; index++) {
        originEndString = originEndString + origin[origin.length - endString.length + index];
      }
-
      return originEndString == endString;
    }
 }
