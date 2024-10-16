@@ -186,20 +186,28 @@ export class DatabaseHelper {
     if (DatabaseHelper.databaseList.has(databaseName)) {
       let local: relationalStore.RdbStore | null = DatabaseHelper.getOnlyLocal(databaseName);
       if (local != null) {
-        await local.close();
-      }
-      DatabaseHelper.databaseList.delete(databaseName);
-      let id: number = -1;
-      DatabaseHelper.databaseIdList.forEach((value, key) => {
-        if (databaseName == value) {
-          id = key;
+        try {
+          await local.close();
+          DatabaseHelper.databaseList.delete(databaseName);
+          let id: number = -1;
+          DatabaseHelper.databaseIdList.forEach((value, key) => {
+            if (databaseName == value) {
+              id = key;
+            }
+          })
+          if (id > -1) {
+            DatabaseHelper.databaseIdList.delete(id);
+            result.success(null);
+            return;
+          }
+        } catch (err) {
+          let code = (err as BusinessError).code;
+          let message = (err as BusinessError).message;
+          result.error('sqlite_error', "close database failed. " + 'error code:' + code + '.  message:' + message, null);
+          return;
         }
-      })
-      if (id > -1) {
-        DatabaseHelper.databaseIdList.delete(id);
-        result.success(null);
-        return;
       }
+
     }
     result.error('sqlite_error', "close database failed, database is not exist, can not close" + " " + databaseId, null);
   }
