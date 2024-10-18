@@ -14,10 +14,6 @@
 */
 
 import common from '@ohos.app.ability.common';
-import AbilityAware from '@ohos/flutter_ohos/src/main/ets/embedding/engine/plugins/ability/AbilityAware';
-import {
-  AbilityPluginBinding
-} from '@ohos/flutter_ohos/src/main/ets/embedding/engine/plugins/ability/AbilityPluginBinding';
 import {
   FlutterPlugin,
   FlutterPluginBinding
@@ -32,8 +28,7 @@ import MethodCall from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodCall
 import { Database } from './Database';
 import { MethodCallOperation } from './operation/MethodCallOperation';
 
-export default class SqflitePlugin implements FlutterPlugin, AbilityAware, MethodCallHandler {
-  private pluginBinding: FlutterPluginBinding | null = null;
+export default class SqflitePlugin implements FlutterPlugin, MethodCallHandler {
   private context: common.Context | null = null;
   private channel: MethodChannel | null = null;
 
@@ -43,13 +38,12 @@ export default class SqflitePlugin implements FlutterPlugin, AbilityAware, Metho
   }
 
   onAttachedToEngine(binding: FlutterPluginBinding): void {
-    this.pluginBinding = binding;
+    this.context = binding.getApplicationContext();
     this.channel = new MethodChannel(binding.getBinaryMessenger(), Constant.PLUGIN_KEY);
     this.channel.setMethodCallHandler(this);
   }
 
   onDetachedFromEngine(binding: FlutterPluginBinding): void {
-    this.pluginBinding = null;
   }
 
   onMethodCall(call: MethodCall, result: MethodResult): void {
@@ -97,14 +91,6 @@ export default class SqflitePlugin implements FlutterPlugin, AbilityAware, Metho
         result.notImplemented();
         break;
     }
-  }
-
-  onAttachedToAbility(binding: AbilityPluginBinding): void {
-    this.context = this.pluginBinding!.getApplicationContext();
-    this.channel?.setMethodCallHandler(this);
-  }
-
-  onDetachedFromAbility(): void {
   }
 
   ///打开数据库
@@ -201,7 +187,6 @@ export default class SqflitePlugin implements FlutterPlugin, AbilityAware, Metho
       return;
     }
     await DatabaseHelper.closeDatabase(call, result);
-
   }
 
   ///删除数据库
