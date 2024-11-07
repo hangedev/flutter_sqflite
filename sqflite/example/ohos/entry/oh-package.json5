@@ -1,0 +1,13 @@
+{
+  "name": "entry",
+  "version": "1.0.0",
+  "description": "Please describe the basic information.",
+  "main": "",
+  "author": "",
+  "license": "",
+  "dependencies": {
+    "integration_test": "file:../har/integration_test.har",
+    "sqflite": "file:../har/sqflite.har",
+    "sqflite_helper": "file:../har/sqflite_helper.har"
+  }
+}

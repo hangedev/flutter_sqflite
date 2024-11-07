@@ -7,16 +7,16 @@ import 'package:sqflite/src/factory_mixin.dart' as impl;
 import 'package:sqflite/utils/utils.dart';
 import 'package:sqflite_example/src/item_widget.dart';
 import 'package:sqflite_example/utils.dart';
-
+import 'dart:io' as ISPlatform;
 // ignore_for_file: avoid_print
-
+import 'database/database_impl.dart';
 import 'model/item.dart';
 import 'src/common_import.dart';
 
 /// Manual test page.
 class ManualTestPage extends StatefulWidget {
   /// Test page.
-  const ManualTestPage({super.key});
+  const ManualTestPage({Key? key}) : super(key: key);
 
   @override
   // ignore: library_private_types_in_public_api
@@ -55,6 +55,10 @@ class _ManualTestPageState extends State<ManualTestPage> {
 
   late List<SqfMenuItem> items;
   late List<ItemWidget> itemWidgets;
+
+  Future<bool> pop() async {
+    return true;
+  }
 
   Future<void> _addAndQuery({int? msDelay, bool? noSynchronized}) async {
     // await databaseFactory.debugSetLogLevel(sqfliteLogLevelVerbose);
@@ -145,8 +149,14 @@ class _ManualTestPageState extends State<ManualTestPage> {
       }, summary: 'Verbose logs, for debugging'),
       SqfMenuItem('Get info', () async {
         final factory = databaseFactory as impl.SqfliteDatabaseFactoryMixin;
-        final info = await factory.getDebugInfo();
-        print(info.toString());
+        try {
+          final info = await Future.any([
+            factory.getDebugInfo(),
+            Future.delayed(Duration(seconds: 5), () => throw Exception('Operation timed out'))
+          ]).timeout(Duration(seconds: 5));
+        } on Exception catch (e) {
+          print('Error: ${e}');
+        }
       }, summary: 'Implementation info (dev only)'),
       SqfMenuItem('Increment version', () async {
         print(await _incrementVersion());
@@ -163,13 +173,27 @@ class _ManualTestPageState extends State<ManualTestPage> {
     ];
   }
 
+  Future<Database> initDatabase() async {
+    if (ISPlatform.Platform.operatingSystem == 'ohos') {
+      final path = await initDeleteDb('big_blob.db');
+      var db = await openDatabase(path, version: 1,
+          onCreate: (Database db, int version) async {
+        await db
+            .execute('CREATE TABLE Test (id INTEGER PRIMARY KEY, value BLOB)');
+      });
+      return db;
+    } else {
+      var db = await openDatabase(inMemoryDatabasePath, version: 1,
+          onCreate: (Database db, int version) async {
+        await db
+            .execute('CREATE TABLE Test (id INTEGER PRIMARY KEY, value BLOB)');
+      });
+      return db;
+    }
+  }
+
   Future<void> testBigBlog(int size) async {
-    // await Sqflite.devSetDebugModeOn(true);
-    var db = await openDatabase(inMemoryDatabasePath, version: 1,
-        onCreate: (Database db, int version) async {
-      await db
-          .execute('CREATE TABLE Test (id INTEGER PRIMARY KEY, value BLOB)');
-    });
+    var db = await initDatabase();
     try {
       var blob =
           Uint8List.fromList(List.generate(size, (index) => index % 256));
@@ -215,8 +239,11 @@ class _ManualTestPageState extends State<ManualTestPage> {
       appBar: AppBar(
         title: const Text('Manual tests'),
       ),
-      body: ListView(
-        children: itemWidgets,
+      body: WillPopScope(
+        onWillPop: pop,
+        child: ListView(
+          children: itemWidgets,
+        ),
       ),
     );
   }
@@ -225,7 +252,7 @@ class _ManualTestPageState extends State<ManualTestPage> {
 /// Multiple db test page.
 class MultipleDbTestPage extends StatelessWidget {
   /// Test page.
-  const MultipleDbTestPage({super.key});
+  const MultipleDbTestPage({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -260,7 +287,7 @@ class MultipleDbTestPage extends StatelessWidget {
 /// Simple db test page.
 class SimpleDbTestPage extends StatefulWidget {
   /// Simple db test page.
-  const SimpleDbTestPage({super.key, required this.dbName});
+  const SimpleDbTestPage({Key? key, required this.dbName}) : super(key: key);
 
   /// db name.
   final String dbName;
@@ -314,8 +341,8 @@ class _SimpleDbTestPageState extends State<SimpleDbTestPage> {
               final db = await _openDatabase();
               final result =
                   firstIntValue(await db.query('test', columns: ['COUNT(*)']));
-              // Temp for nnbd successful lint
-              if (context.mounted) {
+              // Temp for nnbd successfull lint
+              if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                   content: Text('$result records'),
                   duration: const Duration(milliseconds: 700),

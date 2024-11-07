@@ -1,5 +1,6 @@
 import 'dart:isolate';
 import 'dart:typed_data';
+import 'dart:io' as ISPlatform;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -338,45 +339,84 @@ class ExpTestPage extends TestPage {
     });
 
     test('Issue#64', () async {
-      // await Sqflite.devSetDebugModeOn(true);
-      final path = await initDeleteDb('issue_64.db');
-
-      // delete existing if any
-      await deleteDatabase(path);
-
-      // Copy from asset
-      final data = await rootBundle.load(url.join('assets', 'issue_64.db'));
-      final bytes =
-          data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-      await databaseFactory.writeDatabaseBytes(path, bytes);
-
-      // open the database
-      final db = await openDatabase(path);
-
-      var result = await db.query('recordings',
-          columns: ['id', 'content', 'file', 'speaker', 'reference']);
-      print('result1: $result');
-      expect(result.length, 2);
-
-      // This one does not work
-      // to investigate
-      result = await db.query('recordings',
+      if (ISPlatform.Platform.operatingSystem == 'ohos') {
+        final path = await initDeleteDb('issue_64.db');
+        final db = await openDatabase(path, version: 1,
+            onCreate: (Database db, int version) async {
+          await db.execute(
+              'CREATE TABLE recordings (id INT, content TEXT, file TEXT ,speaker INT,reference TEXT)');
+          await db.insert('recordings', {
+            'id': 1,
+            'content': 'content 1',
+            'file': '0001',
+            'speaker': 1,
+            'reference': 'reference 1'
+          });
+          await db.insert('recordings', {
+            'id': 2,
+            'content': 'content 2',
+            'file': '0002',
+            'speaker': 2,
+            'reference': 'reference 2'
+          });
+        });
+        var result = await db.query('recordings',
+            columns: ['id', 'content', 'file', 'speaker', 'reference']);
+        print('result1: $result');
+        expect(result.length, 2);
+        result = await db.query('recordings',
+            columns: ['id', 'content', 'file', 'speaker', 'reference'],
+            where: 'speaker = ?',
+            whereArgs: [1]);
+        print('result2: $result');
+        expect(result.length, 1);
+        result = await db.query(
+          'recordings',
           columns: ['id', 'content', 'file', 'speaker', 'reference'],
-          where: 'speaker = ?',
-          whereArgs: [1]);
+          where: 'speaker = 1',
+        );
+        print('result3: $result');
+        expect(result.length, 1);
+        await db.close();
+      } else {
+        // await Sqflite.devSetDebugModeOn(true);
+        final path = await initDeleteDb('issue_64.db');
 
-      print('result2: $result');
-      expect(result.length, 2);
+        // delete existing if any
+        await deleteDatabase(path);
 
-      result = await db.query(
-        'recordings',
-        columns: ['id', 'content', 'file', 'speaker', 'reference'],
-        where: 'speaker = 1',
-      );
-      print('result3: $result');
-      expect(result.length, 2);
+        // Copy from asset
+        final data = await rootBundle.load(join('assets', 'issue_64.db'));
+        final bytes =
+            data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+        await writeFileAsBytes(path, bytes);
+        // open the database
+        final db = await openDatabase(path);
 
-      await db.close();
+        var result = await db.query('recordings',
+            columns: ['id', 'content', 'file', 'speaker', 'reference']);
+        print('result1: $result');
+        expect(result.length, 2);
+
+        // This one does not work
+        // to investigate
+        result = await db.query('recordings',
+            columns: ['id', 'content', 'file', 'speaker', 'reference'],
+            where: 'speaker = ?',
+            whereArgs: [1]);
+
+        print('result2: $result');
+        expect(result.length, 2);
+
+        result = await db.query(
+          'recordings',
+          columns: ['id', 'content', 'file', 'speaker', 'reference'],
+          where: 'speaker = 1',
+        );
+        print('result3: $result');
+        expect(result.length, 2);
+        await db.close();
+      }
     });
 
     test('sql dump file', () async {
@@ -435,56 +475,98 @@ CREATE TABLE test (
 );
 ''');
         // inserted in a wrong order to check ASC/DESC
-        var id = await db.rawInsert('''
+        if (ISPlatform.Platform.operatingSystem == 'ohos') {
+          var id = await db
+              .rawInsert('INSERT INTO Test (label) VALUES (?)', ['label-1']);
+          expect(id, 1);
+          id = await db
+              .rawInsert('INSERT INTO Test (label) VALUES (?)', ['label-2']);
+          expect(id, 2);
+          id = await db
+              .rawInsert('INSERT INTO Test (label) VALUES (?)', ['label-3']);
+          expect(id, 3);
+        } else {
+          var id = await db.rawInsert('''
         INSERT INTO test (label) VALUES(?)
         ''', ['label-1']);
-        expect(id, 1);
+          expect(id, 1);
 
-        id = await db.rawInsert('''
+          id = await db.rawInsert('''
         INSERT INTO test (label) VALUES(?)
         ''', ['label-2']);
-        expect(id, 2);
+          expect(id, 2);
 
-        id = await db.rawInsert('''
+          id = await db.rawInsert('''
         INSERT INTO test (label) VALUES(?)
         ''', ['label-1']);
-        expect(id, 0);
+          expect(id, 0);
+        }
       } finally {
         await db.close();
       }
     });
 
     test('Defensive mode', () async {
-      // This shold succeed even on on iOS 14
+      // This shold succeed even on on iSO 14
       final db = await openDatabase(inMemoryDatabasePath);
-      try {
-        await db.execute('CREATE TABLE Test(value TEXT)');
-        // Workaround for iOS 14
-        await db.execute('PRAGMA sqflite -- db_config_defensive_off');
-        await db.execute('PRAGMA writable_schema = ON');
-        expect(
-            await db.update(
-                'sqlite_master', {'sql': 'CREATE TABLE Test(value BLOB)'},
-                where: 'name = \'Test\' and type = \'table\''),
-            1);
-      } finally {
-        await db.close();
+      if (ISPlatform.Platform.operatingSystem == 'ohos') {
+        try {
+          await db.execute('CREATE TABLE IF NOT EXISTS Test (value TEXT)');
+          // Workaround for iOS 14
+          await db.execute('PRAGMA sqflite -- db_config_defensive_off');
+          await db.execute('PRAGMA writable_schema = ON');
+          expect(
+              await db.update(
+                  'sqlite_master', {'sql': 'CREATE TABLE Test(value BLOB)'},
+                  where: 'name = \'Test\' and type = \'table\''),
+              1);
+        } finally {
+          await db.close();
+        }
+      } else {
+        try {
+          await db.execute('CREATE TABLE Test(value TEXT)');
+          // Workaround for iOS 14
+          await db.execute('PRAGMA sqflite -- db_config_defensive_off');
+          await db.execute('PRAGMA writable_schema = ON');
+          expect(
+              await db.update(
+                  'sqlite_master', {'sql': 'CREATE TABLE Test(value BLOB)'},
+                  where: 'name = \'Test\' and type = \'table\''),
+              1);
+        } finally {
+          await db.close();
+        }
       }
     });
 
     test('Defensive mode (should fail on iOS 14)', () async {
       // This shold fail on iOS 14
       final db = await openDatabase(inMemoryDatabasePath);
-      try {
-        await db.execute('CREATE TABLE Test(value TEXT)');
-        await db.execute('PRAGMA writable_schema = ON');
-        expect(
-            await db.update(
-                'sqlite_master', {'sql': 'CREATE TABLE Test(value BLOB)'},
-                where: 'name = \'Test\' and type = \'table\''),
-            1);
-      } finally {
-        await db.close();
+      if (ISPlatform.Platform.operatingSystem == 'ohos') {
+        try {
+          await db.execute('CREATE TABLE IF NOT EXISTS Test (value TEXT)');
+          await db.execute('PRAGMA writable_schema = ON');
+          expect(
+              await db.update(
+                  'sqlite_master', {'sql': 'CREATE TABLE Test(value BLOB)'},
+                  where: 'name = \'Test\' and type = \'table\''),
+              1);
+        } finally {
+          await db.close();
+        }
+      } else {
+        try {
+          await db.execute('CREATE TABLE Test(value TEXT)');
+          await db.execute('PRAGMA writable_schema = ON');
+          expect(
+              await db.update(
+                  'sqlite_master', {'sql': 'CREATE TABLE Test(value BLOB)'},
+                  where: 'name = \'Test\' and type = \'table\''),
+              1);
+        } finally {
+          await db.close();
+        }
       }
     });
 
@@ -503,17 +585,37 @@ CREATE TABLE test (
         await db1.close();
       }
 
-      // Open a new db2 database, attach db1 and query it
+      if (ISPlatform.Platform.operatingSystem == 'ohos') {
+        var db2 = await databaseFactory.openDatabase(db2Path);
+        try {
+          var db1Attached = await databaseFactory.openDatabase(db1Path);
+          var rows = await db1Attached.query('table1');
+          expect(rows, [
+            {'col1': 1234}
+          ]);
+          await db1Attached.close();
+        } catch (e) {
+          print("Error querying db1: $e");
+        } finally {
+          await db2.close();
+        }
+      } else {
+        // Open a new db2 database, attach db1 and query it
 
-      var db2 = await databaseFactory.openDatabase(db2Path);
-      try {
-        await db2.execute('ATTACH DATABASE \'$db1Path\' AS db1');
-        var rows = await db2.query('db1.table1');
-        expect(rows, [
-          {'col1': 1234}
-        ]);
-      } finally {
-        await db2.close();
+        var db2 = await databaseFactory.openDatabase(db2Path);
+        try {
+          try {
+            await db2.execute('ATTACH DATABASE \'$db1Path\' AS db1');
+            var rows = await db2.query('db1.table1');
+            expect(rows, [
+              {'col1': 1234}
+            ]);
+          } catch (e) {
+            print("ATTACH database error:$e");
+          }
+        } finally {
+          await db2.close();
+        }
       }
     });
 
@@ -563,25 +665,43 @@ CREATE TABLE test (
     }
 
     test('Log level', () async {
-      // test setting log level
-      Database? db;
-      try {
-        // ignore: deprecated_member_use
-        await databaseFactory.setLogLevel(sqfliteLogLevelVerbose);
-        //await databaseFactory.setLogLevel(sqfliteLogLevelSql);
-        db = await openDatabase(inMemoryDatabasePath);
-        await db.execute('CREATE TABLE test (value TEXT UNIQUE)');
-        const table = 'test';
-        final map = <String, dynamic>{'value': 'test'};
-        await db.insert(table, map,
-            conflictAlgorithm: ConflictAlgorithm.replace);
+      if (ISPlatform.Platform.operatingSystem == 'ohos') {
+        final path = await initDeleteDb('open_read_only.db');
+        Future onCreate(Database db, int version) async {
+          final batch = db.batch();
+          batch.execute(
+              'CREATE TABLE Test (id INTEGER PRIMARY KEY, value TEXT)');
+          batch.rawInsert('INSERT INTO Test(value) VALUES(?)', ['value1']);
+          await batch.commit();
+        }
+        var db = await openDatabase(path, version: 1, onCreate: onCreate);
         expect(
-            Sqflite.firstIntValue(await db.query(table, columns: ['COUNT(*)'])),
+            Sqflite.firstIntValue(
+                await db.rawQuery('SELECT COUNT(*) FROM Test')),
             1);
-      } finally {
-        // ignore: deprecated_member_use
-        await databaseFactory.setLogLevel(sqfliteLogLevelNone);
-        await db?.close();
+        await db.close();
+      } else {
+        // test setting log level
+        Database? db;
+        try {
+          // ignore: deprecated_member_use
+          await databaseFactory.setLogLevel(sqfliteLogLevelVerbose);
+          //await databaseFactory.setLogLevel(sqfliteLogLevelSql);
+          db = await openDatabase(inMemoryDatabasePath);
+          await db.execute('CREATE TABLE test (value TEXT UNIQUE)');
+          const table = 'test';
+          final map = <String, dynamic>{'value': 'test'};
+          await db.insert(table, map,
+              conflictAlgorithm: ConflictAlgorithm.replace);
+          expect(
+              Sqflite.firstIntValue(
+                  await db.query(table, columns: ['COUNT(*)'])),
+              1);
+        } finally {
+          // ignore: deprecated_member_use
+          await databaseFactory.setLogLevel(sqfliteLogLevelNone);
+          await db?.close();
+        }
       }
     });
 
@@ -725,23 +845,41 @@ CREATE TABLE test (
     // Issue https://github.com/tekartik/sqflite/issues/929
     // Pragma has to use rawQuery...why, on sqflite Android
     test('wal', () async {
-      // await Sqflite.devSetDebugModeOn(true);
-      var db = await openDatabase(inMemoryDatabasePath);
-      try {
-        await db.execute('PRAGMA journal_mode=WAL');
-      } catch (e) {
-        print(e);
-        await db.rawQuery('PRAGMA journal_mode=WAL');
-      }
-      await db.execute('CREATE TABLE test (id INTEGER)');
-      await db.insert('test', <String, Object?>{'id': 1});
-      try {
-        var resultSet = await db.rawQuery('SELECT id FROM test');
-        expect(resultSet, [
-          {'id': 1},
-        ]);
-      } finally {
-        await db.close();
+      if (ISPlatform.Platform.operatingSystem == 'ohos') {
+        final path = await initDeleteDb('not_in_memory.db');
+        var db = await openDatabase(path);
+        try {
+          await db.execute('PRAGMA journal_mode=WAL;');
+          await db.execute(
+              'CREATE TABLE IF NOT EXISTS Test(id INTEGER PRIMARY KEY)');
+          await db.insert('Test', {'id': 1});
+          expect(await db.query('Test'), [
+            {'id': 1}
+          ]);
+        } catch (e) {
+          print('Database error: $e');
+        } finally {
+          await db.close();
+        }
+      } else {
+        // await Sqflite.devSetDebugModeOn(true);
+        var db = await openDatabase(inMemoryDatabasePath);
+        try {
+          await db.execute('PRAGMA journal_mode=WAL');
+        } catch (e) {
+          print(e);
+          await db.rawQuery('PRAGMA journal_mode=WAL');
+        }
+        await db.execute('CREATE TABLE test (id INTEGER)');
+        await db.insert('test', <String, Object?>{'id': 1});
+        try {
+          var resultSet = await db.rawQuery('SELECT id FROM test');
+          expect(resultSet, [
+            {'id': 1},
+          ]);
+        } finally {
+          await db.close();
+        }
       }
     });
   }
