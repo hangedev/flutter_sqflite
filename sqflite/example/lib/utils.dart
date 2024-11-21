@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite/sqflite_dev.dart';
 
@@ -8,5 +9,8 @@ Future sleep([int milliseconds = 0]) =>
 /// Supports compat mode (devSetDebugModeOn, queryAsMap, fts4, some error handled - missing parameter, bad file)
 bool get supportsCompatMode {
   // ignore: invalid_use_of_visible_for_testing_member
+  if (defaultTargetPlatform == TargetPlatform.ohos) {
+    return false;
+  }
   return databaseFactory == sqfliteDatabaseFactoryDefault;
 }

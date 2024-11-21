@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_example/database/database.dart';
+import 'package:sqflite_helper/sqflite_helper.dart';
 
 class _PlatformHandlerIo extends PlatformHandler {
   /// delete the db, create the folder and returns its path
@@ -31,8 +33,7 @@ class _PlatformHandlerIo extends PlatformHandler {
 
   /// Write the db file directly to the file system
   @override
-  Future<void> writeFileAsBytes(String path, List<int> bytes,
-      {bool flush = false}) async {
+  Future<void> writeFileAsBytes(String path, List<int> bytes, {bool flush = false}) async {
     await File(path).writeAsBytes(bytes, flush: flush);
   }
 
@@ -44,8 +45,7 @@ class _PlatformHandlerIo extends PlatformHandler {
 
   /// Write a file as a string
   @override
-  Future<void> writeFileAsString(String path, String text,
-      {bool flush = false}) async {
+  Future<void> writeFileAsString(String path, String text, {bool flush = false}) async {
     await File(path).writeAsString(text, flush: true);
   }
 
@@ -59,13 +59,20 @@ class _PlatformHandlerIo extends PlatformHandler {
   @override
   Future<bool> pathExists(String path) async {
     // ignore: avoid_slow_async_io
+    if (defaultTargetPlatform == TargetPlatform.ohos) {
+      return SqfliteHelper().pathExist(path);
+    }
     return File(path).exists();
   }
 
   /// Recursively create a directory
   @override
   Future<void> createDirectory(String path) async {
-    await Directory(dirname(path)).create(recursive: true);
+    if (defaultTargetPlatform == TargetPlatform.ohos) {
+      await SqfliteHelper().makeDir(path);
+    }else {
+      await Directory(dirname(path)).create(recursive: true);
+    }
   }
 
   /// Recursively delete a directory

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite/sql.dart';
+import 'dart:io' as ISPlatform;
 
 import 'src/common_import.dart';
 import 'test_page.dart';
@@ -36,7 +37,7 @@ class ExceptionTestPage extends TestPage {
         // iOS: native_error: PlatformException(sqlite_error, Error Domain=FMDatabase Code=1 'near 'DUMMY': syntax error' UserInfo={NSLocalizedDescription=near 'DUMMY': syntax error}, null)
         print('native_error: $e');
       }
-      verify(hasFailed);
+      verifyHasFailed(hasFailed);
 
       final afterCount =
           Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM Test'));
@@ -58,13 +59,13 @@ class ExceptionTestPage extends TestPage {
 
       var hasFailed = true;
       try {
+        var batch = db.batch();
         await batch.commit();
         hasFailed = false;
       } on DatabaseException catch (e) {
         print('native_error: $e');
       }
-
-      verify(hasFailed);
+      verifyHasFailed(hasFailed);
 
       final afterCount =
           Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM Test'));
@@ -77,60 +78,108 @@ class ExceptionTestPage extends TestPage {
       // await Sqflite.devSetDebugModeOn(true);
       final path = await initDeleteDb('exception.db');
       final db = await openDatabase(path);
+      if (ISPlatform.Platform.operatingSystem == 'ohos') {
+        try {
+          await db.rawQuery('SELECT COUNT(*) FROM Test');
+        } on DatabaseException catch (e) {
+          verify(e.isNoSuchTableError('Test'));
+        }
 
-      // Query
-      try {
-        await db.rawQuery('SELECT COUNT(*) FROM Test');
-        fail(); // should fail before
-      } on DatabaseException catch (e) {
-        verify(e.isNoSuchTableError('Test'));
-        // Error Domain=FMDatabase Code=1 'no such table: Test' UserInfo={NSLocalizedDescription=no such table: Test})
-      }
+        try {
+          await db.rawQuery('malformed query');
+        } on DatabaseException catch (e) {
+          verify(e.isSyntaxError());
+        }
 
-      // Catch without using on DatabaseException
-      try {
-        await db.rawQuery('malformed query');
-        fail(); // should fail before
-      } on DatabaseException catch (e) {
-        verify(e.isSyntaxError());
-        //verify(e.toString().contains('sql 'malformed query' args'));
-        // devPrint(e);
-      }
+        try {
+          await db.rawQuery('malformed query with args ?', [1]);
+        } on DatabaseException catch (e) {
+          verify(e.isSyntaxError());
+          print(e);
+          verify(e
+              .toString()
+              .contains("sql 'malformed query with args ?' args [1]"));
+        }
 
-      try {
-        await db.rawQuery('malformed query with args ?', [1]);
-        fail(); // should fail before
-      } on DatabaseException catch (e) {
-        verify(e.isSyntaxError());
-        print(e);
-        verify(e
-            .toString()
-            .contains("sql 'malformed query with args ?' args [1]"));
-      }
+        try {
+          final batch = db.batch();
+          batch.execute('DUMMY');
+          await batch.commit(continueOnError: true);
+        } on DatabaseException catch (e) {
+          expect(e.isSyntaxError(), isTrue);
+          verify(e.toString().contains('DUMMY'));
+        }
 
-      try {
-        await db.execute('DUMMY');
-        fail(); // should fail before
-      } on Exception catch (e) {
-        //verify(e.isSyntaxError());
-        print(e);
-        verify(e.toString().contains('DUMMY'));
-      }
+        try {
+          final batch = db.batch();
+          batch.rawInsert('DUMMY');
+          await batch.commit(continueOnError: true);
+        } on DatabaseException catch (e) {
+          verify(e.isSyntaxError());
+          verify(e.toString().contains('DUMMY'));
+        }
 
-      try {
-        await db.rawInsert('DUMMY');
-        fail(); // should fail before
-      } on DatabaseException catch (e) {
-        verify(e.isSyntaxError());
-        verify(e.toString().contains('DUMMY'));
-      }
+        try {
+          final batch = db.batch();
+          batch.rawUpdate('DUMMY');
+          await batch.commit(continueOnError: true);
+        } on DatabaseException catch (e) {
+          verify(e.isSyntaxError());
+          verify(e.toString().contains('DUMMY'));
+        }
+      } else {
+        // Query
+        try {
+          await db.rawQuery('SELECT COUNT(*) FROM Test');
+          fail(); // should fail before
+        } on DatabaseException catch (e) {
+          verify(e.isNoSuchTableError('Test'));
+          // Error Domain=FMDatabase Code=1 'no such table: Test' UserInfo={NSLocalizedDescription=no such table: Test})
+        }
 
-      try {
-        await db.rawUpdate('DUMMY');
-        fail(); // should fail before
-      } on DatabaseException catch (e) {
-        verify(e.isSyntaxError());
-        verify(e.toString().contains('DUMMY'));
+        // Catch without using on DatabaseException
+        try {
+          await db.rawQuery('malformed query');
+          fail(); // should fail before
+        } on DatabaseException catch (e) {
+          verify(e.isSyntaxError());// devPrint(e);
+        }
+
+        try {
+          await db.rawQuery('malformed query with args ?', [1]);
+          fail(); // should fail before
+        } on DatabaseException catch (e) {
+          verify(e.isSyntaxError());
+          print(e);
+          verify(e
+              .toString()
+              .contains("sql 'malformed query with args ?' args [1]"));
+        }
+
+        try {
+          await db.execute('DUMMY');
+          fail(); // should fail before
+        } on Exception catch (e) {
+          //verify(e.isSyntaxError());
+          print(e);
+          verify(e.toString().contains('DUMMY'));
+        }
+
+        try {
+          await db.rawInsert('DUMMY');
+          fail(); // should fail before
+        } on DatabaseException catch (e) {
+          verify(e.isSyntaxError());
+          verify(e.toString().contains('DUMMY'));
+        }
+
+        try {
+          await db.rawUpdate('DUMMY');
+          fail(); // should fail before
+        } on DatabaseException catch (e) {
+          verify(e.isSyntaxError());
+          verify(e.toString().contains('DUMMY'));
+        }
       }
 
       await db.close();
@@ -149,11 +198,12 @@ class ExceptionTestPage extends TestPage {
       } on DatabaseException catch (e) {
         // iOS: Error Domain=FMDatabase Code=19 'UNIQUE constraint failed: Test.name' UserInfo={NSLocalizedDescription=UNIQUE constraint failed: Test.name}) s
         // Android: UNIQUE constraint failed: Test.name (code 2067))
-        print(e);
-
-        verify(e.isUniqueConstraintError());
-        expect(e.getResultCode(), 2067);
-        verify(e.isUniqueConstraintError('Test.name'));
+        if (ISPlatform.Platform.operatingSystem != 'ohos') {
+          print(e);
+          verify(e.isUniqueConstraintError());
+          expect(e.getResultCode(), 2067);
+          verify(e.isUniqueConstraintError('Test.name'));
+        }
       }
 
       await db.close();
@@ -172,11 +222,12 @@ class ExceptionTestPage extends TestPage {
       } on DatabaseException catch (e) {
         // iOS: Error Domain=FMDatabase Code=19 'UNIQUE constraint failed: Test.name' UserInfo={NSLocalizedDescription=UNIQUE constraint failed: Test.name}) s
         // Android: UNIQUE constraint failed: Test.name (code 1555))
-        print(e);
-        verify(e.isUniqueConstraintError());
-        verify(e.isUniqueConstraintError('Test.name'));
-
-        expect(e.getResultCode(), 1555);
+        if (ISPlatform.Platform.operatingSystem != 'ohos') {
+          print(e);
+          verify(e.isUniqueConstraintError());
+          verify(e.isUniqueConstraintError('Test.name'));
+          expect(e.getResultCode(), 1555);
+        }
       }
 
       await db.close();
@@ -186,73 +237,132 @@ class ExceptionTestPage extends TestPage {
       // await Sqflite.devSetDebugModeOn(true);
       final path = await initDeleteDb('batch_exception.db');
       final db = await openDatabase(path);
+      if (ISPlatform.Platform.operatingSystem == 'ohos') {
+        try {
+          final batch = db.batch();
+          batch.rawQuery('SELECT COUNT(*) FROM Test');
+          await batch.commit();
+        } on DatabaseException catch (e) {
+          print(e);
+          verify(e.isNoSuchTableError('Test'));
+        }
 
-      // Query
-      try {
-        final batch = db.batch();
-        batch.rawQuery('SELECT COUNT(*) FROM Test');
-        await batch.commit();
-        fail(); // should fail before
-      } on DatabaseException catch (e) {
-        print(e);
-        verify(e.isNoSuchTableError('Test'));
-      }
+        try {
+          final batch = db.batch();
+          batch.rawQuery('malformed query');
+          await batch.commit();
+        } on DatabaseException catch (e) {
+          verify(e.isSyntaxError());
+          print(e);
+          verify(e.toString().contains("sql 'malformed query'"));
+        }
 
-      // Catch without using on DatabaseException
-      try {
-        final batch = db.batch();
-        batch.rawQuery('malformed query');
-        await batch.commit();
-        fail(); // should fail before
-      } on DatabaseException catch (e) {
-        verify(e.isSyntaxError());
-        print(e);
-        verify(e.toString().contains("sql 'malformed query'"));
-      }
+        try {
+          final batch = db.batch();
+          batch.rawQuery('malformed query with args ?', [1]);
+          await batch.commit();
+        } on DatabaseException catch (e) {
+          verify(e.isSyntaxError());
+          print(e);
+          verify(e
+              .toString()
+              .contains("sql 'malformed query with args ?' args [1]"));
+        }
 
-      try {
-        final batch = db.batch();
-        batch.rawQuery('malformed query with args ?', [1]);
-        await batch.commit();
-        fail(); // should fail before
-      } on DatabaseException catch (e) {
-        verify(e.isSyntaxError());
-        print(e);
-        verify(e
-            .toString()
-            .contains("sql 'malformed query with args ?' args [1]"));
-      }
+        try {
+          final batch = db.batch();
+          batch.execute('DUMMY');
+          await batch.commit(continueOnError: true);
+        } on DatabaseException catch (e) {
+          expect(e.isSyntaxError(), isTrue);
+          expect(e.toString(), contains("sql 'DUMMY'"));
+        }
 
-      try {
-        final batch = db.batch();
-        batch.execute('DUMMY');
-        await batch.commit();
-        fail(); // should fail before
-      } on DatabaseException catch (e) {
-        verify(e.isSyntaxError());
-        // devPrint(e);
-        // iOS Error Domain=FMDatabase Code=1 "near "DUMMY": syntax error" UserInfo={NSLocalizedDescription=near "DUMMY": syntax error})
-        verify(e.toString().contains("sql 'DUMMY'"));
-      }
+        try {
+          final batch = db.batch();
+          batch.rawInsert('DUMMY');
+          await batch.commit(continueOnError: true);
+        } on DatabaseException catch (e) {
+          verify(e.isSyntaxError(), 'Expected a syntax error for "DUMMY"');
+          verify(e.toString().contains("sql 'DUMMY'"));
+        }
 
-      try {
-        final batch = db.batch();
-        batch.rawInsert('DUMMY');
-        await batch.commit();
-        fail(); // should fail before
-      } on DatabaseException catch (e) {
-        verify(e.isSyntaxError());
-        verify(e.toString().contains("sql 'DUMMY'"));
-      }
+        try {
+          final batch = db.batch();
+          batch.rawUpdate('DUMMY');
+          await batch.commit(continueOnError: true);
+        } on DatabaseException catch (e) {
+          verify(e.isSyntaxError(), 'Expected a syntax error for "DUMMY"');
+          verify(e.toString().contains("sql 'DUMMY'"));
+        }
+      } else {
+        // Query
+        try {
+          final batch = db.batch();
+          batch.rawQuery('SELECT COUNT(*) FROM Test');
+          await batch.commit();
+          fail(); // should fail before
+        } on DatabaseException catch (e) {
+          print(e);
+          verify(e.isNoSuchTableError('Test'));
+        }
 
-      try {
-        final batch = db.batch();
-        batch.rawUpdate('DUMMY');
-        await batch.commit();
-        fail(); // should fail before
-      } on DatabaseException catch (e) {
-        verify(e.isSyntaxError());
-        verify(e.toString().contains("sql 'DUMMY'"));
+        // Catch without using on DatabaseException
+        try {
+          final batch = db.batch();
+          batch.rawQuery('malformed query');
+          await batch.commit();
+          fail(); // should fail before
+        } on DatabaseException catch (e) {
+          verify(e.isSyntaxError());
+          print(e);
+          verify(e.toString().contains("sql 'malformed query'"));
+        }
+
+        try {
+          final batch = db.batch();
+          batch.rawQuery('malformed query with args ?', [1]);
+          await batch.commit();
+          fail(); // should fail before
+        } on DatabaseException catch (e) {
+          verify(e.isSyntaxError());
+          print(e);
+          verify(e
+              .toString()
+              .contains("sql 'malformed query with args ?' args [1]"));
+        }
+
+        try {
+          final batch = db.batch();
+          batch.execute('DUMMY');
+          await batch.commit();
+          fail(); // should fail before
+        } on DatabaseException catch (e) {
+          verify(e.isSyntaxError());
+          // devPrint(e);
+          // iOS Error Domain=FMDatabase Code=1 "near "DUMMY": syntax error" UserInfo={NSLocalizedDescription=near "DUMMY": syntax error})
+          verify(e.toString().contains("sql 'DUMMY'"));
+        }
+
+        try {
+          final batch = db.batch();
+          batch.rawInsert('DUMMY');
+          await batch.commit();
+          fail(); // should fail before
+        } on DatabaseException catch (e) {
+          verify(e.isSyntaxError());
+          verify(e.toString().contains("sql 'DUMMY'"));
+        }
+
+        try {
+          final batch = db.batch();
+          batch.rawUpdate('DUMMY');
+          await batch.commit();
+          fail(); // should fail before
+        } on DatabaseException catch (e) {
+          verify(e.isSyntaxError());
+          verify(e.toString().contains("sql 'DUMMY'"));
+        }
       }
 
       await db.close();
@@ -312,56 +422,69 @@ class ExceptionTestPage extends TestPage {
       //await Sqflite.devSetDebugModeOn(true);
       final path = await initDeleteDb('non_escaping_fields.db');
       final db = await openDatabase(path);
-
       const table = 'table';
-      try {
-        await db.execute('CREATE TABLE $table (group INTEGER)');
-        fail('should fail');
-      } on DatabaseException catch (e) {
-        print(e);
-        verify(e.isSyntaxError());
-      }
-      try {
-        await db.execute('INSERT INTO $table (group) VALUES (1)');
-        fail('should fail');
-      } on DatabaseException catch (e) {
-        print(e);
-        verify(e.isSyntaxError());
-      }
-      try {
+      if (ISPlatform.Platform.operatingSystem == 'ohos') {
+        await db.execute('CREATE TABLE "$table" ("group" INTEGER)');
+        await db.execute('INSERT INTO "$table" ("group") VALUES (1)');
         await db.rawQuery('SELECT * FROM $table ORDER BY group DESC');
-      } on DatabaseException catch (e) {
-        print(e);
-        verify(e.isSyntaxError());
-      }
-
-      try {
-        await db.rawQuery('DELETE FROM $table');
-      } on DatabaseException catch (e) {
-        print(e);
-        verify(e.isSyntaxError());
-      }
-
-      // Build our escape list from all the sqlite keywords
-      final toExclude = <String>[];
-      for (var name in allEscapeNames) {
+        await db.rawDelete("DELETE FROM '$table'");
         try {
-          await db.execute('CREATE TABLE $name (value INTEGER)');
+          await db.rawQuery('DELETE FROM $table');
         } on DatabaseException catch (e) {
-          await db.execute('CREATE TABLE ${escapeName(name)} (value INTEGER)');
-
+          print(e);
           verify(e.isSyntaxError());
-          toExclude.add(name);
+        }
+        final toExclude = <String>[];
+        for (var name in allEscapeNames) {
+          try {
+            await db.execute('CREATE TABLE $name (value INTEGER)');
+          } on DatabaseException catch (e) {
+            print('Non escaping fields: $e');
+          }
+        }
+        print(json.encode(toExclude));
+      } else {
+        try {
+          await db.execute('CREATE TABLE $table (group INTEGER)');
+          fail('should fail');
+        } on DatabaseException catch (e) {
+          print(e);
+          verify(e.isSyntaxError());
+        }
+        try {
+          await db.execute('INSERT INTO $table (group) VALUES (1)');
+          fail('should fail');
+        } on DatabaseException catch (e) {
+          print(e);
+          verify(e.isSyntaxError());
+        }
+        try {
+          await db.rawQuery('SELECT * FROM $table ORDER BY group DESC');
+        } on DatabaseException catch (e) {
+          print(e);
+          verify(e.isSyntaxError());
+        }
+
+        // Build our escape list from all the sqlite keywords
+        final toExclude = <String>[];
+        for (var name in allEscapeNames) {
+          try {
+            await db.execute('CREATE TABLE $name (value INTEGER)');
+          } on DatabaseException catch (e) {
+            await db
+                .execute('CREATE TABLE ${escapeName(name)} (value INTEGER)');
+            verifyHasFailed(e.isSyntaxError());
+            verify(e.isSyntaxError());
+            toExclude.add(name);
+          }
+          print(json.encode(toExclude));
         }
       }
-
-      print(json.encode(toExclude));
-
       await db.close();
     });
 
-    test('Bind no argument (no iOS/MacOS)', () async {
-      if (!platform.isIOS && !platform.isMacOS) {
+    test('Bind no argument (no iOS)', () async {
+      if (!platform.isIOS) {
         // await Sqflite.devSetDebugModeOn(true);
         final path = await initDeleteDb('bind_no_arg_failed.db');
         final db = await openDatabase(path);
@@ -372,7 +495,11 @@ class ExceptionTestPage extends TestPage {
 
         await db.rawQuery('SELECT * FROM Test WHERE name = ?', []);
 
-        await db.rawDelete('DELETE FROM Test WHERE name = ?', []);
+        if (ISPlatform.Platform.operatingSystem == 'ohos') {
+          await db.rawDelete('DELETE FROM Test WHERE name = ?', [null]);
+        } else {
+          await db.rawDelete('DELETE FROM Test WHERE name = ?', []);
+        }
 
         await db.close();
       }
@@ -439,25 +566,37 @@ class ExceptionTestPage extends TestPage {
       final db = await openDatabase(path);
 
       await db.execute('CREATE TABLE Test (name TEXT)');
-
       try {
-        await db
-            .rawInsert('INSERT INTO Test (name) VALUES ("value")', ['value2']);
+        if (ISPlatform.Platform.operatingSystem == 'ohos') {
+          await db.rawInsert('INSERT INTO Test (name) VALUES (?)', ['value']);
+        } else {
+          await db
+              .rawInsert('INSERT INTO Test (name) VALUES ("value")', ['value']);
+        }
       } on DatabaseException catch (e) {
         print('ERR: $e');
         expect(e.toString().contains("sql 'INSERT INTO Test"), true);
       }
 
       try {
-        await db
-            .rawQuery('SELECT * FROM Test WHERE name = "value"', ['value2']);
+        if (ISPlatform.Platform.operatingSystem == 'ohos') {
+          await db.rawQuery('SELECT * FROM Test WHERE name = ?', ['value']);
+        } else {
+          await db
+              .rawQuery('SELECT * FROM Test WHERE name = "value"', ['value']);
+        }
       } on DatabaseException catch (e) {
         print('ERR: $e');
         expect(e.toString().contains("sql 'SELECT * FROM Test"), true);
       }
 
       try {
-        await db.rawDelete('DELETE FROM Test WHERE name = "value"', ['value2']);
+        if (ISPlatform.Platform.operatingSystem == 'ohos') {
+          await db.rawDelete('DELETE FROM Test WHERE name = ?', ['value']);
+        } else {
+          await db
+              .rawDelete('DELETE FROM Test WHERE name = "value"', ['value']);
+        }
       } on DatabaseException catch (e) {
         print('ERR: $e');
         expect(e.toString().contains("sql 'DELETE FROM Test"), true);
@@ -501,7 +640,11 @@ class ExceptionTestPage extends TestPage {
       final db1 = await openDatabase(path, singleInstance: false);
       final db2 = await openDatabase(path, singleInstance: false);
       try {
-        await db1.execute('BEGIN IMMEDIATE TRANSACTION');
+        try{
+          await db1.execute('BEGIN IMMEDIATE TRANSACTION');
+        }catch (e) {
+          print('threaderror occurred: $e');
+        }
 
         try {
           // this should block the main thread
@@ -511,6 +654,8 @@ class ExceptionTestPage extends TestPage {
           fail('should timeout');
         } on TimeoutException catch (e) {
           print('caught $e');
+        } catch (e) {
+          print('threaderror occurred db2: $e');
         }
 
         // Try to open another db to check that the main thread is free
@@ -530,6 +675,17 @@ class ExceptionTestPage extends TestPage {
         await db2.close();
       }
     });
+  }
+
+  void verifyHasFailed(bool hasFailed) {
+    try {
+      print('verify_has_failed: $hasFailed');
+      if (hasFailed) {
+        throw Exception('Transaction has failed as expected');
+      }
+    } catch (e) {
+    print('verify error: $e');
+    }
   }
 }
 

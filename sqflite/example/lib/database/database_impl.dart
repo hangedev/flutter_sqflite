@@ -16,15 +16,13 @@ abstract class PlatformHandler {
   }
 
   /// Write the db file directly to the file system
-  Future<void> writeFileAsBytes(String path, List<int> bytes,
-      {bool flush = false});
+  Future<void> writeFileAsBytes(String path, List<int> bytes, {bool flush = false});
 
   /// Read a file as bytes
   Future<Uint8List> readFileAsBytes(String path);
 
   /// Write a file as a string
-  Future<void> writeFileAsString(String path, String text,
-      {bool flush = false});
+  Future<void> writeFileAsString(String path, String text, {bool flush = false});
 
   /// Read a file as a string
   Future<String> readFileAsString(String path);
@@ -47,41 +45,33 @@ abstract class PlatformHandler {
 // ---
 
 /// delete the db, create the folder and returnes its path
-Future<String> initDeleteDb(String dbName) =>
-    platformHandler.initDeleteDb(dbName);
+Future<String> initDeleteDb(String dbName) => platformHandler.initDeleteDb(dbName);
 
 /// Write the db file directly to the file system
-Future<void> writeFileAsBytes(String path, List<int> bytes,
-        {bool flush = false}) =>
+Future<void> writeFileAsBytes(String path, List<int> bytes, {bool flush = false}) =>
     platformHandler.writeFileAsBytes(path, bytes, flush: flush);
 
 /// Read a file as bytes
-Future<Uint8List> readFileAsBytes(String path) =>
-    platformHandler.readFileAsBytes(path);
+Future<Uint8List> readFileAsBytes(String path) => platformHandler.readFileAsBytes(path);
 
 /// Write a file as a string
-Future<void> writeFileAsString(String path, String text,
-        {bool flush = false}) =>
+Future<void> writeFileAsString(String path, String text, {bool flush = false}) =>
     platformHandler.writeFileAsString(path, text, flush: flush);
 
 /// Read a file as a string
-Future<String> readFileAsString(String path) =>
-    platformHandler.readFileAsString(path);
+Future<String> readFileAsString(String path) => platformHandler.readFileAsString(path);
 
 /// Check if a path exists.
 Future<bool> pathExists(String path) => platformHandler.pathExists(path);
 
 /// Recursively create a directory
-Future<void> createDirectory(String path) =>
-    platformHandler.createDirectory(path);
+Future<void> createDirectory(String path) => platformHandler.createDirectory(path);
 
 /// Recursively delete a directory
-Future<void> deleteDirectory(String path) =>
-    platformHandler.deleteDirectory(path);
+Future<void> deleteDirectory(String path) => platformHandler.deleteDirectory(path);
 
 /// Check if a directory exists
-Future<bool> existsDirectory(String path) =>
-    platformHandler.existsDirectory(path);
+Future<bool> existsDirectory(String path) => platformHandler.existsDirectory(path);
 
 PlatformHandler? _platformHandler;
 
