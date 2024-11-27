@@ -363,7 +363,7 @@ class _SimpleDbTestPageState extends State<SimpleDbTestPage> {
                 await countRecord();
               }, summary: 'Count records. Open the database if needed'),
               menuItem(
-                'Close Database', 
+                'Close Database',
                 () async {
                   await _closeDatabase();
                 },
