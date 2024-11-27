@@ -22,7 +22,7 @@ class RawTestPage extends TestPage {
       final db = await openDatabase(path);
       try {
         await db.execute('CREATE TABLE Test (id INTEGER PRIMARY KEY, name TEXT)');
-        expect(await db.rawInsert('INSERT INTO Test (name) VALUES (?)', ['test']),1);
+        expect(await db.rawInsert('INSERT INTO Test (name) VALUES (?)', ['test']), 1);
 
         final result = await db.query('Test');
         final expected = [
