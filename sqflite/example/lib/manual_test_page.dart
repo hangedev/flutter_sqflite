@@ -372,6 +372,9 @@ class _SimpleDbTestPageState extends State<SimpleDbTestPage> {
                 'Delete database',
                 () async {
                   await databaseFactory.deleteDatabase(widget.dbName);
+                  if (ISPlatform.Platform.operatingSystem == 'ohos') {
+                    await _closeDatabase();
+                  }
                 },
               ),
             ];
