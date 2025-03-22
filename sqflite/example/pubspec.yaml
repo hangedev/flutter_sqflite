@@ -24,8 +24,9 @@ dependencies:
     # the parent directory to use the current plugin's version.
     # path: /Users/liaochengjin/Documents/lzb/sqflite_helper/
     git:
-      url: https://gitee.com/simplelove520/sqflite_helper.git
-      path:
+      url: https://gitcode.com/openharmony-sig/flutter_samples.git
+      path: ohos/sqflite_helper
+      ref: master
 
 dev_dependencies:
   flutter_lints:
