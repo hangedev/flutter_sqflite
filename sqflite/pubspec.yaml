@@ -63,10 +63,10 @@ dependencies:
     sdk: flutter
   sqflite_common: '>=2.5.0-1 <4.0.0'
   path: '>=1.8.0 <3.0.0'
-#  sqflite_common:
-#    git:
-#      url: "https://gitee.com/openharmony-sig/flutter_sqflite.git"
-#      path: "sqflite_common"
+  sqflite_common:
+    git:
+      url: "https://gitcode.com/openharmony-sig/flutter_sqflite.git"
+      path: "sqflite_common"
   # sqflite_ohos:
   #   path: sqflite_ohos
     
