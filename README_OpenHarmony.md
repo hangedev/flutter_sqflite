@@ -10,7 +10,7 @@ sqflite是Flutter的一个插件，它提供了对 SQLite 数据库的访问和�
 OpenHarmony北向生态发展过程中，已经适配Flutter的厂商在接入OpenHarmony过程中存在使用sqflite的诉求。鉴于此OpenHarmony为支持北向生态伙伴快速接入鸿蒙、快速实现产品化而提供的sqflite，本方案采用插件化的适配器模式实现sqflite鸿蒙化版本的兼容。
 
 ## 使用场景
-本方案仅供应用厂商中已支持Flutter框架的设备在移植OpenHarmony系统过程中作为备选方案使用。
+本方案仅供已支持Flutter框架的设备在迁移至OpenHarmony系统时作为备选方案使用。
 
 ## 使用文档
 
