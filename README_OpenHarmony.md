@@ -14,7 +14,7 @@ OpenHarmony北向生态发展过程中，已经适配Flutter的厂商在接入Op
 
 ## 使用文档
 
-适配OpenHarmony平台的使用指导请见：[Flutter使用指导文档](https://gitee.com/openharmony-sig/flutter_samples/blob/master/ohos/docs/07_plugin/ohos%E5%B9%B3%E5%8F%B0%E9%80%82%E9%85%8Dflutter%E4%B8%89%E6%96%B9%E5%BA%93%E6%8C%87%E5%AF%BC.md)
+适配OpenHarmony平台的使用指导请见：[Flutter使用指导文档](https://gitcode.com/openharmony-sig/flutter_samples/blob/master/ohos/docs/07_plugin/ohos%E5%B9%B3%E5%8F%B0%E9%80%82%E9%85%8Dflutter%E4%B8%89%E6%96%B9%E5%BA%93%E6%8C%87%E5%AF%BC.md)
 
 ## License
 
