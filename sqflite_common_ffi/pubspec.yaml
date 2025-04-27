@@ -21,7 +21,7 @@ environment:
   sdk: '>=3.3.0 <4.0.0'
 
 dependencies:
-  sqlite3: '>=1.11.0 <3.0.0'
+  sqlite3: '>=2.3.0 <4.0.0'
   sqflite_common:
     git:
       url: "https://gitcode.com/openharmony-sig/flutter_sqflite.git"
