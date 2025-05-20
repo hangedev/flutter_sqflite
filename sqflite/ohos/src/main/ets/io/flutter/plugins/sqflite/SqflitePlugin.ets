@@ -101,7 +101,7 @@ export default class SqflitePlugin implements FlutterPlugin, MethodCallHandler {
   ///获取数据库路径
   handleGetDatabasesPathCall(call: MethodCall, result: MethodResult) {
     let appContext = this.context!.getApplicationContext();
-    let path: string = appContext.databaseDir;
+    let path: string = appContext.databaseDir + "/rdb";
     result.success(path);
   }
 
