@@ -24,6 +24,9 @@ import MethodCall from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodCall
 import fs from '@ohos.file.fs';
 import { HashMap } from '@kit.ArkTS';
 
+const TOKENIZER_SUPPORT_API = 17;
+const BEGIN_LOCATION = 6;
+
 export class DatabaseHelper {
   /// 已加载的数据库, 存储数据库名称与数据库实例
   public static dbMap: Map<string, relationalStore.RdbStore> = new Map<string, relationalStore.RdbStore>();
@@ -160,7 +163,7 @@ export class DatabaseHelper {
   private static createDatabaseConfig(dbNameList: string[], dbName: string, isReadOnly?: boolean): relationalStore.StoreConfig {
     //自定义数据库路径
     let customDir: string = '';
-    for (let index = 6; index < dbNameList.length - 1; index++) {
+    for (let index = BEGIN_LOCATION; index < dbNameList.length - 1; index++) {
       if (customDir.length > 0) {
         customDir = customDir + '/' + dbNameList[index];
       } else {
@@ -168,13 +171,26 @@ export class DatabaseHelper {
       }
     }
 
-    let config: relationalStore.StoreConfig = {
-      name: dbName, // 数据库文件名
-      securityLevel: relationalStore.SecurityLevel.S1, // 数据库安全级别
-      customDir: customDir.length > 0 ? customDir : undefined,
-      isReadOnly: isReadOnly
-    };
-    return config;
+    let customDirPath = customDir.length > 0 ? customDir : undefined;
+    let sdkApiVersion = deviceInfo.sdkApiVersion;
+    let config: relationalStore.StoreConfig | undefined = undefined;
+    if (sdkApiVersion >= TOKENIZER_SUPPORT_API) {
+      config = {
+        name: dbName, // 数据库文件名
+        securityLevel: relationalStore.SecurityLevel.S1, // 数据库安全级别
+        customDir: customDirPath,
+        tokenizer: relationalStore.Tokenizer.ICU_TOKENIZER,
+        isReadOnly: isReadOnly
+      }
+    }else {
+      config = {
+        name: dbName, // 数据库文件名
+        securityLevel: relationalStore.SecurityLevel.S1, // 数据库安全级别
+        customDir: customDirPath,
+        isReadOnly: isReadOnly
+      }
+    }
+    return config!;
   }
 
   private static getDatabaseNameByDbPathDirList(dbPathDirList: string[]) : string {
