@@ -9,6 +9,7 @@ import 'package:sqflite_example/manual_test_page.dart';
 import 'package:sqflite_example/src/dev_utils.dart';
 
 import 'model/main_item.dart';
+import 'new_features_test_page.dart';
 import 'open_test_page.dart';
 import 'raw_test_page.dart';
 import 'slow_test_page.dart';
@@ -70,6 +71,9 @@ const String testExpRoute = '/test/exp';
 /// Deprecated test page.
 const String testDeprecatedRoute = '/test/deprecated';
 
+/// New features test page.
+const String testNewFeaturesRoute = '/test/features';
+
 class _SqfliteExampleAppState extends State<SqfliteExampleApp> {
   var routes = <String, WidgetBuilder>{
     '/test': (BuildContext context) => MyHomePage(),
@@ -83,6 +87,7 @@ class _SqfliteExampleAppState extends State<SqfliteExampleApp> {
     testExceptionRoute: (BuildContext context) => ExceptionTestPage(),
     testExpRoute: (BuildContext context) => ExpTestPage(),
     testDeprecatedRoute: (BuildContext context) => DeprecatedTestPage(),
+    testNewFeaturesRoute: (BuildContext context) => NewFeaturesTestPage(),
   };
 
   @override
@@ -120,6 +125,7 @@ class MyHomePage extends StatefulWidget {
     _items.add(MainItem('Exception tests', 'Tests that trigger exceptions', route: testExceptionRoute));
     _items.add(MainItem('Manual tests', 'Tests that requires manual execution', route: testManualRoute));
     _items.add(MainItem('Deprecated test', 'Keeping some old tests for deprecated functionalities', route: testDeprecatedRoute));
+    _items.add(MainItem('NewFeatures test', 'Testing of all new features', route: testNewFeaturesRoute));
 
     // Uncomment to view all logs
     //Sqflite.devSetDebugModeOn(true);

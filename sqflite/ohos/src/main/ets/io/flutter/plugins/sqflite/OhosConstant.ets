@@ -91,4 +91,10 @@ export class Constant {
   static ERROR_DATABASE_CLOSED: string = "database_closed";// msg
   // memory database path
   static MEMORY_DATABASE_PATH: string = ":memory:";
+
+  static SQL_BEGIN_IMMEDIATE: string = "BEGIN IMMEDIATE";
+  static SQL_COMMIT: string = "COMMIT";
+  static SQL_BEGIN_EXCLUSIVE: string = "BEGIN EXCLUSIVE";
+  static SQL_ATTACH: string = "ATTACH";
+  static SQL_DETACH: string = "DETACH";
 }
