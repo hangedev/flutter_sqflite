@@ -21,7 +21,6 @@
   "author": "",
   "license": "",
   "dependencies": {
-    "integration_test": "file:../har/integration_test.har",
     "sqflite": "file:../har/sqflite.har"
   }
 }

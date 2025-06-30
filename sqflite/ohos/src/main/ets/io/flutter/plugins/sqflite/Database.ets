@@ -25,6 +25,10 @@ import MethodCall from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodCall
 import { MethodCallOperation } from './operation/MethodCallOperation';
 import { BatchOperation } from './operation/BatchOperation';
 import { Any } from '@ohos/flutter_ohos';
+import { AttachHandler, BeginExclusiveHandler, BeginImmediateHandler, CommitHandler,
+  DetachHandler,
+  ISqlHandler } from './SqlHandler';
+
 
 type HandleCallback = (x: Object) => void;
 
@@ -44,6 +48,14 @@ export class Database {
     this.singleInstance = singleInstance;
     this.logLevel = logLevel;
   }
+
+  private static handlers: ISqlHandler[] = [
+    new BeginImmediateHandler(),
+    new CommitHandler(),
+    new BeginExclusiveHandler(),
+    new AttachHandler(),
+    new DetachHandler(),
+  ];
 
   private static enterOrLeaveInTransaction(value: Boolean): void {
     if(value == true) {
@@ -88,39 +100,29 @@ export class Database {
 
   /// execute
   public static async execute(operation: Operation, db: relationalStore.RdbStore): Promise<void> {
-    let command: SqlCommand = operation.getSqlCommand();
-    let sql: string = command.getSql();
-    let executeSuccess: boolean = false;
-    let inTransactionChange: boolean = operation.getInTransactionChange();
-    let enteringTransaction: boolean = (inTransactionChange == true && operation.hasNullTransactionId());
-    if(enteringTransaction) {
-      Database.currentTransactionId = ++ (Database.lastTransactionId);
+    const sql = operation.getSqlCommand().getSql();
+    const inTransactionChange = operation.getInTransactionChange();
+    const enteringTransaction = inTransactionChange && operation.hasNullTransactionId();
+
+    if (enteringTransaction) {
+      Database.currentTransactionId = ++(Database.lastTransactionId);;
     }
 
-    if(sql == 'BEGIN IMMEDIATE') {
-      db.beginTransaction();
-      Database.enterOrLeaveInTransaction(inTransactionChange);
-      executeSuccess = true;
-      Database.handleExecute(executeSuccess, enteringTransaction, operation, inTransactionChange);
-      return;
-    } else if(sql == 'COMMIT') {
-      db.commit();
-      Database.enterOrLeaveInTransaction(inTransactionChange);
-      executeSuccess = true;
-      Database.handleExecute(executeSuccess, enteringTransaction, operation, inTransactionChange);
-      return;
-    } else if (sql == 'BEGIN EXCLUSIVE') {
-      Database.enterOrLeaveInTransaction(inTransactionChange);
-      executeSuccess = true;
-      Database.handleExecute(executeSuccess, enteringTransaction, operation, inTransactionChange);
-      return;
+    const handler = Database.handlers.find((h) => h.match(sql));
+    let success: boolean;
+    if (handler) {
+      const result = handler.execute(sql, operation, db);
+      success = result instanceof Promise ? await result : result;
+    } else {
+      success = await Database.executeOrError(operation, db);
     }
-
-    executeSuccess = await Database.executeOrError(operation, db);
-    Database.handleExecute(executeSuccess, enteringTransaction, operation, inTransactionChange);
+    if (handler?.needsPostProcess ?? true) {
+      Database.enterOrLeaveInTransaction(inTransactionChange);
+      Database.handleExecute(success, enteringTransaction, operation, inTransactionChange);
+    }
   }
 
-  private static handleExecute(executeSuccess: boolean, enteringTransaction: boolean, operation: Operation, inTransactionChange: Boolean) {
+  private static handleExecute(executeSuccess: boolean, enteringTransaction: boolean, operation: Operation, inTransactionChange: boolean) {
     if(!executeSuccess) {
       // Revert if needed
       if(enteringTransaction) {
