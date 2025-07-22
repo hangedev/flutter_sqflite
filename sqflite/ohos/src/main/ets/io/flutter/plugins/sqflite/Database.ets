@@ -25,9 +25,15 @@ import MethodCall from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodCall
 import { MethodCallOperation } from './operation/MethodCallOperation';
 import { BatchOperation } from './operation/BatchOperation';
 import { Any } from '@ohos/flutter_ohos';
-import { AttachHandler, BeginExclusiveHandler, BeginImmediateHandler, CommitHandler,
+import {
+  AttachHandler,
+  BeginExclusiveHandler,
+  BeginImmediateHandler,
+  CommitHandler,
   DetachHandler,
-  ISqlHandler } from './SqlHandler';
+  ISqlHandler
+} from './SqlHandler';
+import { deviceInfo } from '@kit.BasicServicesKit';
 
 
 type HandleCallback = (x: Object) => void;
@@ -41,6 +47,7 @@ export class Database {
   private static lastTransactionId: number = 0;
   private static currentTransactionId: number | null;
   private static transactionDepth: number = 0;
+
   constructor(context: common.Context, path: string, id: number, singleInstance: boolean, logLevel: number) {
     this.context = context;
     this.path = path;
@@ -58,7 +65,7 @@ export class Database {
   ];
 
   private static enterOrLeaveInTransaction(value: Boolean): void {
-    if(value == true) {
+    if (value == true) {
       Database.transactionDepth++;
     } else if (value == false) {
       Database.transactionDepth--;
@@ -68,20 +75,21 @@ export class Database {
   private static handleException(operation: Operation, err: BusinessError<void>) {
     let code = err.code;
     let message = err.message;
-    if (code == 801) {
+    if (code == Constant.RDB_ERROR_CODE_801) {
       message = message + " Database is readonly"
     }
     operation.error(Constant.SQLITE_ERROR, 'error code:' + code + '。' + message, '');
   }
 
-  private static async executeOrError(operation: Operation, db: relationalStore.RdbStore, callback?: HandleCallback): Promise<boolean> {
+  private static async executeOrError(operation: Operation, db: relationalStore.RdbStore,
+    callback?: HandleCallback): Promise<boolean> {
     let command: SqlCommand = operation.getSqlCommand();
     let operationInTransaction: boolean = operation.getInTransactionChange();
     let sqlArguments: ValueType[] | undefined = operation.getArgument(Constant.PARAM_SQL_ARGUMENTS);
     let sql: string = command.getSql();
     let promise: ValueType;
-    try{
-      if(sqlArguments == undefined || sqlArguments.length < 1) {
+    try {
+      if (sqlArguments == undefined || sqlArguments.length < 1) {
         promise = await db.execute(sql) as ValueType;
       } else {
         promise = await db.execute(sql, sqlArguments) as ValueType;
@@ -92,7 +100,7 @@ export class Database {
         callback(promise)
       }
       return true;
-    } catch(err) {
+    } catch (err) {
       Database.handleException(operation, err);
       return false;
     }
@@ -105,7 +113,8 @@ export class Database {
     const enteringTransaction = inTransactionChange && operation.hasNullTransactionId();
 
     if (enteringTransaction) {
-      Database.currentTransactionId = ++(Database.lastTransactionId);;
+      Database.currentTransactionId = ++(Database.lastTransactionId);
+      ;
     }
 
     const handler = Database.handlers.find((h) => h.match(sql));
@@ -122,15 +131,16 @@ export class Database {
     }
   }
 
-  private static handleExecute(executeSuccess: boolean, enteringTransaction: boolean, operation: Operation, inTransactionChange: boolean) {
-    if(!executeSuccess) {
+  private static handleExecute(executeSuccess: boolean, enteringTransaction: boolean, operation: Operation,
+    inTransactionChange: boolean) {
+    if (!executeSuccess) {
       // Revert if needed
-      if(enteringTransaction) {
+      if (enteringTransaction) {
         Database.currentTransactionId = null;
       }
-    } else if(enteringTransaction) {
+    } else if (enteringTransaction) {
       /// Return the transaction id;
-      if(Database.currentTransactionId != null) {
+      if (Database.currentTransactionId != null) {
         let res: Map<String, Object> = new Map();
         res.set(Constant.PARAM_TRANSACTION_ID, Database.currentTransactionId);
         operation.success(res);
@@ -138,7 +148,7 @@ export class Database {
         operation.success(null);
       }
     } else {
-      if(inTransactionChange == false) {
+      if (inTransactionChange == false) {
         Database.currentTransactionId = null;
       }
       operation.success(null);
@@ -147,7 +157,7 @@ export class Database {
 
   public static async doExecute(operation: Operation, db: relationalStore.RdbStore): Promise<boolean> {
     let executeSuccess: boolean = await Database.executeOrError(operation, db);
-    if(!executeSuccess) {
+    if (!executeSuccess) {
       return false;
     }
     operation.success(null);
@@ -163,12 +173,12 @@ export class Database {
     let executeSuccess: boolean = await Database.executeOrError(operation, db, (rowId) => {
       operation.success(rowId);
     });
-    if(!executeSuccess) {
+    if (!executeSuccess) {
       return false;
     }
 
     // don't get last id if not expected
-    if(operation.getNoResult()) {
+    if (operation.getNoResult()) {
       operation.success(null);
       return true;
     }
@@ -184,12 +194,12 @@ export class Database {
     let executeSuccess: boolean = await Database.executeOrError(operation, db, (rows) => {
       operation.success(rows);
     });
-    if(!executeSuccess) {
+    if (!executeSuccess) {
       return false;
     }
 
     // don't get last id if not expected
-    if(operation.getNoResult()) {
+    if (operation.getNoResult()) {
       operation.success(null);
       return true;
     }
@@ -206,9 +216,9 @@ export class Database {
     let command: SqlCommand = operation.getSqlCommand();
     let sql: string = command.getSql();
 
-    if(sql == 'PRAGMA user_version') {
+    if (sql == Constant.SQL_PRAGMA_USER_VERSION) {
       let versionMap: Map<String, object> = new Map<String, object>();
-      versionMap.set(Constant.PARAM_COLUMNS, ['user_version']);
+      versionMap.set(Constant.PARAM_COLUMNS, [Constant.PARAM_USER_VERSION]);
       versionMap.set(Constant.PARAM_ROWS, [[db.version]]);
       operation.success(versionMap);
       return true;
@@ -218,53 +228,58 @@ export class Database {
     let sqlArguments: ValueType[] | undefined = operation.getArgument(Constant.PARAM_SQL_ARGUMENTS);
     let suc: boolean = false;
 
-    if(sqlArguments != undefined && sqlArguments.length > 0) {
-      try{
+    if (sqlArguments != undefined && sqlArguments.length > 0) {
+      try {
         let resultSet = await db.querySql(sql, sqlArguments);
         suc = Database.handleQuerySqlResult(operation, resultSet, cursorPageSize);
         return suc;
-      } catch(err) {
+      } catch (err) {
         Database.handleException(operation, err);
         return false;
       }
     } else {
-      try{
+      try {
         let resultSet = await db.querySql(sql);
         suc = Database.handleQuerySqlResult(operation, resultSet, cursorPageSize);
         return suc;
-      } catch(err) {
+      } catch (err) {
         Database.handleException(operation, err);
         return false;
       }
     }
   }
 
-  private static handleQuerySqlResult(operation: Operation, resultSet: relationalStore.ResultSet, cursorPageSize: number | undefined): boolean {
+  private static handleQuerySqlResult(operation: Operation, resultSet: relationalStore.ResultSet,
+    cursorPageSize: number | undefined): boolean {
 
     let results: Map<String, object> = new Map<String, Object>();
     let rows: Array<Array<Object>> = new Array<Array<Object>>();
     let columns: Array<string> | null = null;
+    let valuesType: Array<string> | null = null;
     let columnCount: number = 0;
 
     // resultSet是一个数据集合得游标，默认值想第-1个记录，有效的数据从0开始
-    while(resultSet.goToNextRow()) {
-      if(columns == null) {
+    while (resultSet.goToNextRow()) {
+      if (columns == null) {
         columnCount = resultSet.columnCount;
         columns = new Array<string>();
         rows = new Array<Array<Object>>();
-        let data: Record<string, ValueType> = resultSet.getRow() as Record<string, ValueType>;
-        for(let i = 0; i < columnCount; i++) {
+        valuesType = new Array<string>();
+        let row: Record<string, ValueType> = resultSet.getRow() as Record<string, ValueType>;
+        for (let i = 0; i < columnCount; i++) {
           let columnName = resultSet.getColumnName(i);
           columns.push(columnName);
+          let valueType: string = typeof row[columnName];
+          valuesType.push(valueType);
         }
         results.set(Constant.PARAM_COLUMNS, columns);
         results.set(Constant.PARAM_ROWS, rows);
       }
 
-      let row = Database.cursorRowToList(resultSet, columnCount);
+      let row = Database.cursorRowToList(resultSet, columnCount, valuesType);
       rows.push(row);
-      if(cursorPageSize != null) {
-        if(rows.length >= cursorPageSize) {
+      if (cursorPageSize != null) {
+        if (rows.length >= cursorPageSize) {
           break;
         }
       }
@@ -276,17 +291,30 @@ export class Database {
     return true;
   }
 
-  static cursorRowToList(cursor: relationalStore.ResultSet, length: number): Array<Object> {
+  static cursorRowToList(cursor: relationalStore.ResultSet, length: number,
+    valuesType: Array<string> | null): Array<Object> {
     let list = new Array<Object>();
 
-    for(let i = 0; i < length; i++) {
-      let value: Object = Database.cursorValue(cursor, i);
+    for (let i = 0; i < length; i++) {
+      let value: Object = Database.cursorValue(cursor, i, valuesType![i]);
       list.push(value);
     }
     return list;
   }
 
-  static cursorValue(cursor: relationalStore.ResultSet, index: number): Any {
+  static cursorValue(cursor: relationalStore.ResultSet, index: number, valueType: Any | null): Any {
+    if ('number' == valueType) {
+      let value = cursor.getString(index);
+      let isIntegerString = /^-?\d+$/.test(value);
+      if (value && isIntegerString) {
+        let valueBig = BigInt(value);
+        if (valueBig > Number.MAX_SAFE_INTEGER || valueBig < Number.MIN_SAFE_INTEGER) {
+          return valueBig;
+        } else {
+          return Number.parseInt(valueBig.toString());
+        }
+      }
+    }
     return cursor.getValue(index);
   }
 
@@ -297,22 +325,23 @@ export class Database {
     let noResult: boolean = mainOperation.getNoResult();
     let continueOnError: boolean = mainOperation.getContinueOnError();
 
-    let operations: Array<Map<string, Object>> = mainOperation.getArgument(Constant.PARAM_OPERATIONS) as Array<Map<string, Object>>;
+    let operations: Array<Map<string, Object>> =
+      mainOperation.getArgument(Constant.PARAM_OPERATIONS) as Array<Map<string, Object>>;
     let results: Array<Map<string, Object>> = new Array();
 
-    for(let index = 0; index < operations.length; index++) {
+    for (let index = 0; index < operations.length; index++) {
 
       const map: Map<string, Object> = operations[index];
       let operation: BatchOperation = new BatchOperation(map, noResult);
       const method: string = operation.getMethod();
 
       let executeSuc: boolean;
-      switch(method) {
+      switch (method) {
         case Constant.METHOD_EXECUTE:
           executeSuc = await Database.doExecute(operation, db);
-          if(executeSuc) {
+          if (executeSuc) {
             operation.handleSuccess(results);
-          } else if(continueOnError) {
+          } else if (continueOnError) {
             operation.handleErrorContinue(results);
           } else {
             return;
@@ -320,9 +349,9 @@ export class Database {
           break;
         case Constant.METHOD_INSERT:
           executeSuc = await Database.doInsert(operation, db);
-          if(executeSuc) {
+          if (executeSuc) {
             operation.handleSuccess(results);
-          } else if(continueOnError) {
+          } else if (continueOnError) {
             operation.handleErrorContinue(results);
           } else {
             operation.handleError(result);
@@ -331,9 +360,9 @@ export class Database {
           break;
         case Constant.METHOD_QUERY:
           executeSuc = await Database.doQuery(operation, db);
-          if(executeSuc) {
+          if (executeSuc) {
             operation.handleSuccess(results);
-          } else if(continueOnError) {
+          } else if (continueOnError) {
             operation.handleErrorContinue(results);
           } else {
             operation.handleError(result);
@@ -342,9 +371,9 @@ export class Database {
           break;
         case Constant.METHOD_UPDATE:
           executeSuc = await Database.doUpdate(operation, db);
-          if(executeSuc) {
+          if (executeSuc) {
             operation.handleSuccess(results);
-          } else if(continueOnError) {
+          } else if (continueOnError) {
             operation.handleErrorContinue(results);
           } else {
             operation.handleError(result);
@@ -356,7 +385,7 @@ export class Database {
           return;
       }
     }
-    if(noResult) {
+    if (noResult) {
       result.success(null);
     } else {
       result.success(results);

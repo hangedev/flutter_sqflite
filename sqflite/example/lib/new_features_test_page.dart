@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
@@ -77,6 +79,46 @@ class NewFeaturesTestPage extends TestPage {
       final results = await database.query('example', where: 'content MATCH ?', whereArgs: ['sample text']);
       expect(results[0]['name'], 'jack');
     });
+
+    test('Bigint sort', () async {
+      final path = await initDeleteDb('bigint.db');
+      final db = await openDatabase(path);
+      final String _tableName = "users";
+      db.execute("CREATE TABLE users(id INTEGER PRIMARY KEY, name TEXT, age INTEGER, create_t UNLIMITED INT)");
+      List<Map<String, dynamic>> users = [];
+      for (int i = 0; i < 5; i++) {
+        users.add(getUser());
+      }
+      await db.transaction((txn) async {
+        Batch batch = txn.batch();
+        for (var user in users) {
+          batch.insert('users', user);
+        }
+        await batch.commit();
+      });
+
+      final maps = await db.query(_tableName, orderBy: 'create_t ASC');
+      List<int> createTimes = maps.map((user) => user['create_t'] as int).toList();
+      expect(isASC(createTimes), true);
+    });
+  }
+
+  Map<String, dynamic> getUser() {
+    int now = 9223372036854775807;
+    return {
+      'name': 'Jack',
+      'age': Random().nextInt(30000),
+      'create_t': now - Random().nextInt(30000),
+    };
+  }
+
+  bool isASC(List<int> users) {
+    for (int i = 0; i < users.length - 1; i++) {
+      if (users[i] > users[i + 1]) {
+        return false;
+      }
+    }
+    return true;
   }
 
   // 初始化数据库并创建表

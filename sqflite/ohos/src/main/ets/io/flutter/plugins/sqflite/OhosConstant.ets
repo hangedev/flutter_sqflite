@@ -16,7 +16,6 @@
 export class Constant {
   // Can be used as the name MethodChannel or to register with
   static PLUGIN_KEY: string = "com.tekartik.sqflite";
-
   static METHOD_GET_PLATFORM_VERSION: string = "getPlatformVersion";
   static METHOD_GET_DATABASES_PATH: string = "getDatabasesPath";
   static METHOD_DEBUG: string = "debug";
@@ -74,27 +73,31 @@ export class Constant {
   static PARAM_ID: string = "id";
   static PARAM_PATH: string = "path";
   // when opening a database
-  static PARAM_READ_ONLY: string = "readOnly";// boolean
-  static PARAM_SINGLE_INSTANCE: string = "singleInstance";// boolean
-  static PARAM_LOG_LEVEL: string = "logLevel";// int
-  static PARAM_THREAD_PRIORITY: string = "androidThreadPriority";// int
-  static PARAM_THREAD_COUNT: string = "androidThreadCount";// int
-
+  static PARAM_READ_ONLY: string = "readOnly"; // boolean
+  static PARAM_SINGLE_INSTANCE: string = "singleInstance"; // boolean
+  static PARAM_LOG_LEVEL: string = "logLevel"; // int
+  static PARAM_THREAD_PRIORITY: string = "androidThreadPriority"; // int
+  static PARAM_THREAD_COUNT: string = "androidThreadCount"; // int
+  static PARAM_USER_VERSION = "user_version";
   //debugMode
-  static PARAM_CMD: string = "cmd";// debugMode cmd:get/set
+  static PARAM_CMD: string = "cmd"; // debugMode cmd:get/set
   static CMD_GET: string = "get";
   // in batch
   static PARAM_OPERATIONS: string = "operations";
-  static SQLITE_ERROR: string = "sqlite_error";// code
-  static ERROR_BAD_PARAM: string = "bad_param";// internal only
-  static ERROR_OPEN_FAILED: string = "open_failed";// msg
-  static ERROR_DATABASE_CLOSED: string = "database_closed";// msg
+  static SQLITE_ERROR: string = "sqlite_error"; // code
+  static ERROR_BAD_PARAM: string = "bad_param"; // internal only
+  static ERROR_OPEN_FAILED: string = "open_failed"; // msg
+  static ERROR_DATABASE_CLOSED: string = "database_closed"; // msg
   // memory database path
   static MEMORY_DATABASE_PATH: string = ":memory:";
-
   static SQL_BEGIN_IMMEDIATE: string = "BEGIN IMMEDIATE";
   static SQL_COMMIT: string = "COMMIT";
   static SQL_BEGIN_EXCLUSIVE: string = "BEGIN EXCLUSIVE";
   static SQL_ATTACH: string = "ATTACH";
   static SQL_DETACH: string = "DETACH";
+  static SQL_PRAGMA_USER_VERSION = "PRAGMA user_version";
+  static API_17 = 17;
+  static API_20 = 20;
+  static DB_PATH_PARSING_BEGIN_INDEX = 6;
+  static RDB_ERROR_CODE_801 = 801;
 }

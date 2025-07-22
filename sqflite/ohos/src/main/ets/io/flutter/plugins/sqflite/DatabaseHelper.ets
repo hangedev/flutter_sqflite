@@ -24,9 +24,6 @@ import MethodCall from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodCall
 import fs from '@ohos.file.fs';
 import { HashMap } from '@kit.ArkTS';
 
-const TOKENIZER_SUPPORT_API = 17;
-const BEGIN_LOCATION = 6;
-
 export class DatabaseHelper {
   /// 已加载的数据库, 存储数据库名称与数据库实例
   public static dbMap: Map<string, relationalStore.RdbStore> = new Map<string, relationalStore.RdbStore>();
@@ -47,8 +44,9 @@ export class DatabaseHelper {
     if (isExisted && local != null) {
       // 从通过数据库名称从内存中获取数据库ID
       id = DatabaseHelper.getMemoryDatabaseIdByDatabaseName(dbName);
-    }else {
-      let readOnly:boolean = call.argument(Constant.PARAM_READ_ONLY) == undefined ? false : call.argument(Constant.PARAM_READ_ONLY);
+    } else {
+      let readOnly: boolean =
+        call.argument(Constant.PARAM_READ_ONLY) == undefined ? false : call.argument(Constant.PARAM_READ_ONLY);
       let config: relationalStore.StoreConfig = DatabaseHelper.createDatabaseConfig(dbPathDirList, dbName, readOnly);
       try {
         let rdbStore = await relationalStore.getRdbStore(context, config);
@@ -59,7 +57,8 @@ export class DatabaseHelper {
       } catch (err) {
         let code = (err as BusinessError).code;
         let message = (err as BusinessError).message;
-        result.error(Constant.SQLITE_ERROR, 'Error code: ' + code + 'error message: ' + message + '。', 'open database failed');
+        result.error(Constant.SQLITE_ERROR, 'Error code: ' + code + 'error message: ' + message + '。',
+          'open database failed');
         return;
       }
     }
@@ -87,7 +86,7 @@ export class DatabaseHelper {
 
   /// 从已加载的列表里获取一个数据库
   public static getDatabaseOrError(call: MethodCall, result: MethodResult): relationalStore.RdbStore | null {
-    let dbId: number = call.argument("id");
+    let dbId: number = call.argument(Constant.PARAM_ID);
     let dbName: string | undefined = DatabaseHelper.dbIdMap.get(dbId);
     if (typeof dbName == undefined) {
       result.error('sqlite_error', "database_closed" + "" + dbId, null);
@@ -106,7 +105,9 @@ export class DatabaseHelper {
   public static async closeDatabase(call: MethodCall, result: MethodResult): Promise<void> {
     let dbId: number = call.argument(Constant.PARAM_ID);
     let dbName: string | undefined = DatabaseHelper.dbIdMap.get(dbId);
-    if (dbName == undefined) return;
+    if (dbName == undefined) {
+      return;
+    }
     let local: relationalStore.RdbStore | null = DatabaseHelper.getDatabaseFromMemory(dbName);
     if (local != null) {
       try {
@@ -160,10 +161,11 @@ export class DatabaseHelper {
     result.success(null);
   }
 
-  private static createDatabaseConfig(dbNameList: string[], dbName: string, isReadOnly?: boolean): relationalStore.StoreConfig {
+  private static createDatabaseConfig(dbNameList: string[], dbName: string,
+    isReadOnly?: boolean): relationalStore.StoreConfig {
     //自定义数据库路径
     let customDir: string = '';
-    for (let index = BEGIN_LOCATION; index < dbNameList.length - 1; index++) {
+    for (let index = Constant.DB_PATH_PARSING_BEGIN_INDEX; index < dbNameList.length - 1; index++) {
       if (customDir.length > 0) {
         customDir = customDir + '/' + dbNameList[index];
       } else {
@@ -174,7 +176,7 @@ export class DatabaseHelper {
     let customDirPath = customDir.length > 0 ? customDir : undefined;
     let sdkApiVersion = deviceInfo.sdkApiVersion;
     let config: relationalStore.StoreConfig | undefined = undefined;
-    if (sdkApiVersion >= TOKENIZER_SUPPORT_API) {
+    if (sdkApiVersion >= Constant.API_17) {
       config = {
         name: dbName, // 数据库文件名
         securityLevel: relationalStore.SecurityLevel.S1, // 数据库安全级别
@@ -182,7 +184,7 @@ export class DatabaseHelper {
         tokenizer: relationalStore.Tokenizer.ICU_TOKENIZER,
         isReadOnly: isReadOnly
       }
-    }else {
+    } else {
       config = {
         name: dbName, // 数据库文件名
         securityLevel: relationalStore.SecurityLevel.S1, // 数据库安全级别
@@ -193,7 +195,7 @@ export class DatabaseHelper {
     return config!;
   }
 
-  private static getDatabaseNameByDbPathDirList(dbPathDirList: string[]) : string {
+  private static getDatabaseNameByDbPathDirList(dbPathDirList: string[]): string {
     let dbName: string = dbPathDirList[dbPathDirList.length - 1];
     let endWithDb: boolean = Tools.stringEndWith(dbName, '.db');
     if (!endWithDb) {
