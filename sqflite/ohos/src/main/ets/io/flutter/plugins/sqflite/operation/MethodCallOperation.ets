@@ -13,10 +13,13 @@
 * limitations under the License.
 */
 
+import { Any } from '@ohos/flutter_ohos';
 import MethodCall from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodCall';
 import { MethodResult } from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodChannel';
 import { BaseOperation } from './BaseOperation';
 import { OperationResult } from './OperationResult';
+import { deviceInfo } from '@kit.BasicServicesKit';
+import { Constant } from '../OhosConstant';
 
 export class MethodCallOperation extends BaseOperation {
   public result: Result;
@@ -33,7 +36,30 @@ export class MethodCallOperation extends BaseOperation {
   }
 
   getArgument<T>(key: string): T {
-    return this.methodCall.argument(key);
+    let argument: Any = this.methodCall.argument(key);
+    let sdkApiVersion = deviceInfo.sdkApiVersion;
+    let isApproved =
+      ((key == Constant.PARAM_SQL_ARGUMENTS) || (key == Constant.PARAM_OPERATIONS)) && (argument instanceof Array) &&
+        (sdkApiVersion >= Constant.API_20);
+    if (isApproved) {
+      if (key == Constant.PARAM_OPERATIONS) {
+        argument.forEach((argument_map: Any) => {
+          let list_value: Any = argument_map.get("arguments");
+          list_value.forEach((value: Any, index: number) => {
+            if (typeof value == "bigint") {
+              list_value.fill(value.toString(), index, index + 1);
+            }
+          })
+        })
+      } else {
+        argument.forEach((value: Any, index: number) => {
+          if (typeof value == "bigint") {
+            argument.fill(value.toString(), index, index + 1);
+          }
+        })
+      }
+    }
+    return argument;
   }
 
   hasArgument(key: string): boolean {
