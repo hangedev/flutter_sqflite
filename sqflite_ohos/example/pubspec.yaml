@@ -1,0 +1,63 @@
+name: sqflite_example
+description: Demonstrates how to use the sqflite plugin and perform some tests.
+publish_to: none
+version: '0.4.0'
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  path: any
+  collection: any
+  flutter:
+    sdk: flutter
+  sqflite_android:
+  sqflite_common:
+  synchronized:
+  matcher:
+  meta:
+  sqflite_helper:
+    # When depending on this package from a real application you should use:
+    #   sqflite_helper: ^x.y.z
+    # See https://dart.dev/tools/pub/dependencies#version-constraints
+    # The example app is bundled with the plugin so we use a path dependency on
+    # the parent directory to use the current plugin's version.
+    # path: /Users/liaochengjin/Documents/lzb/sqflite_helper/
+    git:
+      url: https://gitcode.com/openharmony-sig/flutter_samples.git
+      path: ohos/sqflite_helper
+      ref: master
+  sqflite_example_common:
+    path: ../../packages_flutter/sqflite_example_common
+  sqflite_ohos:
+  
+
+dev_dependencies:
+  flutter_lints: ">=5.0.0"
+  flutter_test:
+    sdk: flutter
+  # integration_test:
+  #   sdk: flutter
+  test:
+  process_run: '>=1.2.0'
+  pub_semver: 
+
+dependency_overrides:
+  sqflite_ohos:
+    path: ../
+# For information on the generic Dart part of this file, see the
+# following page: https://www.dartlang.org/tools/pub/pubspec
+
+# The following section is specific to Flutter.
+flutter:
+
+  # The following line ensures that the Material Icons font is
+  # included with your application, so that you can use the icons in
+  # the Icons class.
+  uses-material-design: true
+
+  assets:
+    - assets/example.db
+    - assets/issue_64.db
+
+

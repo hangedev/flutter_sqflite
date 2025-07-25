@@ -10,6 +10,7 @@ platforms:
   android:
   ios:
   macos:
+  ohos:
 
 topics:
   - sql
@@ -33,6 +34,8 @@ flutter:
         default_package: sqflite_darwin
       macos:
         default_package: sqflite_darwin
+      ohos:
+        default_package: sqflite_ohos
 
 dependencies:
   flutter:
