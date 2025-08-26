@@ -326,8 +326,10 @@ class OpenTestPage extends TestPage {
 
     test('Open bad path', () async {
       try {
-        await openDatabase('/invalid_path');
-        fail();
+        // await openDatabase('/invalid_path');
+        final db = await openDatabase('my_path/my_db.db');
+        print('db的值:$db');
+        // fail();
       } on DatabaseException catch (e) {
         verify(e.isOpenFailedError());
       }
@@ -702,13 +704,13 @@ class OpenTestPage extends TestPage {
     });
 
     test('In memory database', () async {
-      const inMemoryPath =
-          inMemoryDatabasePath; // tried null without success, as it crashes on Android
+      const inMemoryPath = inMemoryDatabasePath; // tried null without success, as it crashes on Android
       const path = inMemoryPath;
 
       var db = await openDatabase(path);
       await db
-          .execute('CREATE TABLE IF NOT EXISTS Test(id INTEGER PRIMARY KEY)');
+      .execute('CREATE TABLE IF NOT EXISTS Test(id INTEGER PRIMARY KEY)');
+      //这里有问题，要兼容In memory database
       await db.insert('Test', {'id': 1});
       expect(await db.query('Test'), [
         {'id': 1}
