@@ -25,7 +25,7 @@ import MethodCall from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodCall
 import { MethodCallOperation } from './operation/MethodCallOperation';
 import { BatchOperation } from './operation/BatchOperation';
 import { Any } from '@ohos/flutter_ohos';
-
+import { Log } from '@ohos/flutter_ohos';
 type HandleCallback = (x: Object) => void;
 
 export class Database {
@@ -205,11 +205,17 @@ export class Database {
     let sql: string = command.getSql();
 
     if(sql == 'PRAGMA user_version') {
-      let versionMap: Map<String, object> = new Map<String, object>();
-      versionMap.set(Constant.PARAM_COLUMNS, ['user_version']);
-      versionMap.set(Constant.PARAM_ROWS, [[db.version]]);
-      operation.success(versionMap);
-      return true;
+      try {
+        let versionMap: Map<String, object> = new Map<String, object>();
+        versionMap.set(Constant.PARAM_COLUMNS, ['user_version']);
+        versionMap.set(Constant.PARAM_ROWS, [[db.version]]);
+        operation.success(versionMap);
+        return true;
+      } catch (err) {
+        Log.e('Database',`doQuery err ${err}`);
+        Database.handleException(operation, err);
+        return false;
+      }
     }
 
     let cursorPageSize: number | undefined = operation.getArgument(Constant.PARAM_CURSOR_PAGE_SIZE);
