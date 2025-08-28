@@ -30,9 +30,12 @@ flutter:
 dependencies:
   flutter:
     sdk: flutter
-  sqflite_common: '>=2.5.0-1 <4.0.0'
+  sqflite_common:
+    path: ../sqflite_common
   path: '>=1.8.0 <3.0.0'
-  sqflite_platform_interface: '>=2.4.0-0 <4.0.0'
+  sqflite_platform_interface:
+    path: ../sqflite_platform_interface
+
 
 dev_dependencies:
   flutter_lints: ">=5.0.0"
