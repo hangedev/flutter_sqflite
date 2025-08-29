@@ -48,6 +48,12 @@ export class DatabaseHelper {
       let readOnly: boolean =
         call.argument(Constant.PARAM_READ_ONLY) == undefined ? false : call.argument(Constant.PARAM_READ_ONLY);
       let config: relationalStore.StoreConfig = DatabaseHelper.createDatabaseConfig(dbPathDirList, dbName, readOnly);
+
+      // 指定数据库是否需要持久化 需api 18+
+      if(deviceInfo.sdkApiVersion >= 18 && dbPath === Constant.MEMORY_DATABASE_PATH){
+        config.persist = false;
+      }
+
       try {
         let rdbStore = await relationalStore.getRdbStore(context, config);
         DatabaseHelper.dbMap.set(dbName, rdbStore);
