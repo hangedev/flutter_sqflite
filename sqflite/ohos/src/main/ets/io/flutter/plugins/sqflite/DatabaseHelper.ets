@@ -29,6 +29,8 @@ export class DatabaseHelper {
   public static dbMap: Map<string, relationalStore.RdbStore> = new Map<string, relationalStore.RdbStore>();
   /// 加载的数据库, 存储数据库id与数据库名称
   public static dbIdMap: HashMap<number, string> = new HashMap<number, string>();
+  /// 加载的数据库, 存储数据库id与是否只读
+  public static dbIdOnlyMap: HashMap<number, boolean> = new HashMap<number, boolean>();
   /// 当前数据库的id
   private static currentDbId: number = 0;
 
@@ -54,6 +56,7 @@ export class DatabaseHelper {
         DatabaseHelper.currentDbId = DatabaseHelper.currentDbId + 1;
         id = DatabaseHelper.currentDbId;
         DatabaseHelper.dbIdMap.set(id, dbName);
+        DatabaseHelper.dbIdOnlyMap.set(id, readOnly);
       } catch (err) {
         let code = (err as BusinessError).code;
         let message = (err as BusinessError).message;
@@ -214,9 +217,15 @@ export class DatabaseHelper {
     return id;
   }
 
+  public static getMemoryDatabaseNameByDatabaseId(dbid: number): string {
+    return DatabaseHelper.dbIdMap.get(dbid);
+  }
+
   private static removeDatabaseFromMemoryByDatabaseName(dbName: string) {
     DatabaseHelper.dbMap.delete(dbName);
     let id: number = DatabaseHelper.getMemoryDatabaseIdByDatabaseName(dbName);
     DatabaseHelper.dbIdMap.remove(id);
+    DatabaseHelper.dbIdOnlyMap.remove(id);
   }
+
 }
