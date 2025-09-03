@@ -157,6 +157,8 @@ flutter pub get
 
 ## 5. 遗留问题
 
+### memory database ohos未适配
+
 ## 6. 其他
 
 ## 7. 开源协议
