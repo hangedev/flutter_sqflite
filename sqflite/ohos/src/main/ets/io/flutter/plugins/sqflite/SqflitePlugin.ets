@@ -27,6 +27,7 @@ import { Constant } from './OhosConstant';
 import MethodCall from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodCall';
 import { Database } from './Database';
 import { MethodCallOperation } from './operation/MethodCallOperation';
+import { taskPoolExecuteQuery,taskPoolExecuteInsert } from './task/TaskDatabase';
 
 export default class SqflitePlugin implements FlutterPlugin, MethodCallHandler {
   private context: common.Context | null = null;
@@ -140,9 +141,8 @@ export default class SqflitePlugin implements FlutterPlugin, MethodCallHandler {
     if (rdbStore == null) {
       return;
     }
-
-    let operation: MethodCallOperation = new MethodCallOperation(call, result);
-    Database.query(operation, rdbStore);
+    const operation: MethodCallOperation = new MethodCallOperation(call, result);
+    taskPoolExecuteQuery(this.context!,operation);
   }
 
   ///更新（包括删除）数据
@@ -151,6 +151,7 @@ export default class SqflitePlugin implements FlutterPlugin, MethodCallHandler {
     if (rdbStore == null) {
       return;
     }
+
 
     let operation: MethodCallOperation = new MethodCallOperation(call, result);
     Database.update(operation, rdbStore);
