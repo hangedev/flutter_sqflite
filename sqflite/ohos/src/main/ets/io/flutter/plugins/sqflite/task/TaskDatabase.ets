@@ -35,13 +35,6 @@ async function query(context: common.Context, config: relationalStore.StoreConfi
 
   const results: Map<String, Object> = new Map<String, Object>();
 
-  if (sql == Constant.SQL_PRAGMA_USER_VERSION) {
-    results.clear();
-    results.set(Constant.PARAM_COLUMNS, [Constant.PARAM_USER_VERSION]);
-    results.set(Constant.PARAM_ROWS, [[db.version]]);
-    return results;
-  }
-
   let resultSet = await db.querySql(sql, sqlArguments);
 
   let rows: Array<Array<Object>> = new Array<Array<Object>>();
@@ -114,7 +107,7 @@ async function insert(context: common.Context, config: relationalStore.StoreConf
   return res;
 }
 
-export async function taskPoolExecuteQuery(context: common.Context, operation: Operation): Promise<void> {
+export async function taskPoolExecuteQuery(context: common.Context, operation: Operation,db: relationalStore.RdbStore): Promise<void> {
   try {
     const command: SqlCommand = operation.getSqlCommand();
     const sql: string = command.getSql();
@@ -122,10 +115,19 @@ export async function taskPoolExecuteQuery(context: common.Context, operation: O
     const cursorPageSize: number | undefined = operation.getArgument(Constant.PARAM_CURSOR_PAGE_SIZE) as number;
     const config = getStoreConfig(operation);
 
-    const task: taskPool.Task =
-      new taskPool.Task(query, context,config, sql, sqlArguments ?? [], cursorPageSize ?? -1);
-    const result: Map<String, Object> = await taskPool.execute(task) as Map<String, Object>;
-    operation.success(result);
+    // 查询版本的不使用 taskPool 线程
+    if (sql == Constant.SQL_PRAGMA_USER_VERSION) {
+      const result: Map<String, Object> = new Map<String, Object>();
+      result.set(Constant.PARAM_COLUMNS, [Constant.PARAM_USER_VERSION]);
+      result.set(Constant.PARAM_ROWS, [[db.version]]);
+      operation.success(result);
+    }
+    else{
+      const task: taskPool.Task =
+        new taskPool.Task(query, context,config, sql, sqlArguments ?? [], cursorPageSize ?? -1);
+      const result: Map<String, Object> = await taskPool.execute(task) as Map<String, Object>;
+      operation.success(result);
+    }
   } catch (err) {
     handleException(operation, err);
   }
