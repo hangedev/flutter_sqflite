@@ -45,11 +45,13 @@ export class MethodCallOperation extends BaseOperation {
       if (key == Constant.PARAM_OPERATIONS) {
         argument.forEach((argument_map: Any) => {
           let list_value: Any = argument_map.get("arguments");
-          list_value.forEach((value: Any, index: number) => {
-            if (typeof value == "bigint") {
-              list_value.fill(value.toString(), index, index + 1);
-            }
-          })
+          if(list_value){
+            list_value.forEach((value: Any, index: number) => {
+              if (typeof value == "bigint") {
+                list_value.fill(value.toString(), index, index + 1);
+              }
+            })
+          }
         })
       } else {
         argument.forEach((value: Any, index: number) => {

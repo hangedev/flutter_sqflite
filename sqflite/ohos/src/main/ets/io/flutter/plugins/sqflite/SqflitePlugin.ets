@@ -142,7 +142,7 @@ export default class SqflitePlugin implements FlutterPlugin, MethodCallHandler {
       return;
     }
     const operation: MethodCallOperation = new MethodCallOperation(call, result);
-    taskPoolExecuteQuery(this.context!,operation);
+    taskPoolExecuteQuery(this.context!,operation,rdbStore);
   }
 
   ///更新（包括删除）数据
