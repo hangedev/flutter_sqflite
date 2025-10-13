@@ -40,7 +40,7 @@ flutter pub get
 
 在以下版本中已测试通过
 
-1. Flutter: 3.7.12-ohos-1.0.6; SDK: 5.0.0(12); IDE: DevEco Studio: 5.0.13.200; ROM: 5.1.0.120 SP3;
+1. Flutter: 3.27.5-ohos-0.0.1; SDK: 5.0.0(12); IDE: DevEco Studio: 5.1.0.828; ROM: 5.1.0.130 SP8;
 
 ### 2.2 权限要求
 
@@ -86,12 +86,14 @@ flutter pub get
 
 #### **存储类型**
 
-| Name   | Description  | Type   | **ohos Support** |
-| ------ | ------------ | ------ | ---------------- |
-| String | 存储字符串值 | String | yes              |
-| int    | 存储整数值   | int    | yes              |
-| double | 存储浮点数值 | double | yes              |
-| bool   | 存储布尔值   | bool   | yes              |
+| Name      | Description  | Type      | **ohos Support** |
+| --------- | ------------ | --------- | ---------------- |
+| String    | 存储字符串值 | String    | yes              |
+| int       | 存储整数值   | int       | yes              |
+| real      | 存储浮点数值 | double    | no               |
+| bool      | 存储布尔值   | bool      | yes              |
+| null      | 空           | null      | yes              |
+| date_time | 储存时间值   | date_time | yes              |
 
 #### OpenDatabaseOptions
 
@@ -157,7 +159,13 @@ flutter pub get
 
 ## 5. 遗留问题
 
-### memory database ohos未适配
+- [ ] memory database ohos未适配
+
+- [ ] ohos 当前查询返回数据量特别大时，受 taskPool 限制，导致 序列化失败，无法正常返回数据[issue#75](https://gitcode.com/openharmony-sig/flutter_sqflite/issues/75)
+
+
+
+
 
 ## 6. 其他
 
