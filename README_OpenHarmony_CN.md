@@ -159,8 +159,6 @@ flutter pub get
 
 ## 5. 遗留问题
 
-- [ ] memory database ohos未适配
-
 - [ ] ohos 当前查询返回数据量特别大时，受 taskPool 限制，导致 序列化失败，无法正常返回数据[issue#75](https://gitcode.com/openharmony-sig/flutter_sqflite/issues/75)
 
 

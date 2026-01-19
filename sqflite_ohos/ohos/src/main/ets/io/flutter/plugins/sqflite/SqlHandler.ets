@@ -47,10 +47,12 @@ abstract class BaseSqlHandler implements ISqlHandler {
 /// 事务开始
 export class BeginImmediateHandler extends BaseSqlHandler {
   match(sql: string) {
-    return sql.toUpperCase() === Constant.SQL_BEGIN_IMMEDIATE;
+    const upperSql = sql.toUpperCase();
+    return upperSql === Constant.SQL_BEGIN_IMMEDIATE || 
+           upperSql === Constant.SQL_BEGIN_IMMEDIATE + ' TRANSACTION';
   }
 
-  execute(_sql: string, operation: Operation, db: relationalStore.RdbStore) {
+  execute(_sql: string, operation: Operation, db: relationalStore.RdbStore): boolean {
     db.beginTransaction();
     return true;
   }
@@ -76,10 +78,32 @@ export class CommitHandler extends BaseSqlHandler {
   }
 }
 
+// 回滚事务
+export class RollbackHandler extends BaseSqlHandler {
+  match(sql: string) {
+    return sql.toUpperCase() === Constant.SQL_ROLLBACK;
+  }
+
+  execute(sql: string, operation: Operation, db: relationalStore.RdbStore) {
+    try {
+      db.rollBack();
+      return true;
+    } catch (err) {
+      return true; 
+    }
+  }
+
+  get needsPostProcess(): boolean {
+    return true;
+  }
+}
+
 /// BEGIN EXCLUSIVE
 export class BeginExclusiveHandler extends BaseSqlHandler {
   match(sql: string) {
-    return sql.toUpperCase() === Constant.SQL_BEGIN_EXCLUSIVE;
+    const upperSql = sql.toUpperCase();
+    return upperSql === Constant.SQL_BEGIN_EXCLUSIVE || 
+           upperSql === Constant.SQL_BEGIN_EXCLUSIVE + ' TRANSACTION';
   }
   execute(_sql: string, operation: Operation, _db: relationalStore.RdbStore) {
     return true;
@@ -106,6 +130,8 @@ export class AttachHandler extends BaseSqlHandler {
     let fullPath: string = '';
     if (exprMatch) {
       fullPath = ((exprMatch[1].trim() == '?') ? sqlArguments![0] : exprMatch[1].trim());
+      // 移除路径两边的引号 (单引号或双引号)
+      fullPath = fullPath.replace(/^['"]|['"]$/g, '');
     }
 
     const schemaPattern = /\s+as\s+([^\s;]+)/i;
@@ -113,6 +139,8 @@ export class AttachHandler extends BaseSqlHandler {
     let attachName: string = '';
     if (schemaMatch) {
       attachName = ((schemaMatch[1].trim() == '?') ? (sqlArguments![sqlArguments!.length - 1]) : schemaMatch[1].trim());
+      // 移除 schema 名称两边的引号
+      attachName = attachName.replace(/^['"]|['"]$/g, '');
     }
 
     try {

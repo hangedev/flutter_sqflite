@@ -31,7 +31,7 @@ export interface Operation extends OperationResult {
   getContinueOnError(): boolean;
 
   // Only for execute command, true when entering a transaction, false when exiting
-  getInTransactionChange(): boolean;
+  getInTransactionChange(): boolean | null;
 
   /**
    * transaction id if any, only for within a transaction

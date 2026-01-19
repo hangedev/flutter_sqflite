@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:sqflite_common/sqflite.dart';
 import 'package:sqflite_common/sqflite_dev.dart';
+import 'dart:io' as ISPlatform;
 // ignore: implementation_imports
 import 'package:sqflite_common/src/factory_mixin.dart' as impl;
 import 'package:sqflite_common/utils/utils.dart';
@@ -348,6 +349,9 @@ class _SimpleDbTestPageState extends State<SimpleDbTestPage> {
                 'Delete database',
                 () async {
                   await databaseFactory.deleteDatabase(widget.dbName);
+                  if (ISPlatform.Platform.operatingSystem == 'ohos') {
+                    await _closeDatabase();
+                  }
                 },
               ),
             ];
