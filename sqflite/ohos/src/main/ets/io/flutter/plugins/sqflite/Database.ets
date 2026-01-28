@@ -205,11 +205,16 @@ export class Database {
     let sql: string = command.getSql();
 
     if(sql == 'PRAGMA user_version') {
-      let versionMap: Map<String, object> = new Map<String, object>();
-      versionMap.set(Constant.PARAM_COLUMNS, ['user_version']);
-      versionMap.set(Constant.PARAM_ROWS, [[db.version]]);
-      operation.success(versionMap);
-      return true;
+      try{
+        let versionMap: Map<String, object> = new Map<String, object>();
+        versionMap.set(Constant.PARAM_COLUMNS, ['user_version']);
+        versionMap.set(Constant.PARAM_ROWS, [[db.version]]);
+        operation.success(versionMap);
+        return true;
+      } catch(error){
+        Database.handleException(operation,error);
+        return false;
+      }
     }
 
     let cursorPageSize: number | undefined = operation.getArgument(Constant.PARAM_CURSOR_PAGE_SIZE);

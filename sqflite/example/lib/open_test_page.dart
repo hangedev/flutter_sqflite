@@ -906,51 +906,7 @@ class OpenTestPage extends TestPage {
       await writeFileAsString(path, 'dummy', flush: true);
       // check content
       expect(await readFileAsString(path), 'dummy');
-
-      if (ISPlatform.Platform.operatingSystem == 'ohos') {
-        // try read-only
-        expect(await isDatabase(path), isFalse);
-        // try read-write
-        const minExpectedSize = 1000;
-        expect((await readFileAsBytes(path)).length, lessThan(minExpectedSize));
-
-        var db = await factory.openDatabase(path);
-        var versionShouldFail =
-            !supportsCompatMode || platform.isIOS || platform.isMacOS;
-        if (versionShouldFail) {
-          // On iOS it fails
-          try {
-            await db.getVersion();
-          } catch (e) {
-            print('getVersion error');
-          }
-        } else {
-          // On Android the database is re-created
-          await db.getVersion();
-        }
-        await db.close();
-        if (versionShouldFail) {
-          // On iOS it fails
-          try {
-            db = await factory.openDatabase(path,
-                options: OpenDatabaseOptions(version: 1));
-          } catch (e) {
-            print('getVersion error');
-          }
-        } else {
-          db = await factory.openDatabase(path,
-              options: OpenDatabaseOptions(version: 1));
-          // On Android the database is re-created
-          await db.getVersion();
-        }
-        await db.close();
-
-        if (platform.isAndroid) {
-          // Content has changed, it is a big file now!
-          expect((await readFileAsBytes(path)).length,
-              greaterThan(minExpectedSize));
-        }
-
+      // try read-only
         {
           late Database db;
           try {
@@ -960,24 +916,6 @@ class OpenTestPage extends TestPage {
             print('open error');
           }
 
-          try {
-            await db.getVersion();
-          } catch (e) {
-            print('getVersion error');
-          }
-          await db.close();
-          expect(await readFileAsString(path), 'dummy');
-        }
-      } else {
-        // try read-only
-        {
-          late Database db;
-          try {
-            db = await factory.openDatabase(path,
-                options: OpenDatabaseOptions(readOnly: true));
-          } catch (e) {
-            print('open error');
-          }
           try {
             await db.getVersion();
           } catch (e) {
@@ -993,8 +931,21 @@ class OpenTestPage extends TestPage {
         // try read-write
         const minExpectedSize = 1000;
         expect((await readFileAsBytes(path)).length, lessThan(minExpectedSize));
-
-        var db = await factory.openDatabase(path);
+        late Database db;
+        if (ISPlatform.Platform.operatingSystem == 'ohos') {
+          try {
+            db = await factory.openDatabase(path);
+          } on DatabaseException catch (e) {
+             // Ohos Failed to open the database because it is corrupted
+            const ohosCorruptedCode = '14800011';
+            var isCorruptedError =  e.toString().contains('Failed to open the database because it is corrupted') &&  e.toString().contains(ohosCorruptedCode);
+            expect(isCorruptedError, isTrue);
+            return;
+          }
+        } else {
+          db = await factory.openDatabase(path);
+        }
+      
         var versionShouldFail =
             !supportsCompatMode || platform.isIOS || platform.isMacOS;
         if (versionShouldFail) {
@@ -1031,7 +982,6 @@ class OpenTestPage extends TestPage {
           expect((await readFileAsBytes(path)).length,
               greaterThan(minExpectedSize));
         }
-      }
     });
   }
 }

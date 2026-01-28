@@ -59,9 +59,6 @@ class _PlatformHandlerIo extends PlatformHandler {
   @override
   Future<bool> pathExists(String path) async {
     // ignore: avoid_slow_async_io
-    if (defaultTargetPlatform == TargetPlatform.ohos) {
-      return SqfliteHelper().pathExist(path);
-    }
     return File(path).exists();
   }
 
