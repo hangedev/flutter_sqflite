@@ -190,8 +190,8 @@ class BatchTestPage extends TestPage {
         batch.execute('CREATE TABLE Test (id INTEGER PRIMARY KEY, name TEXT)');
         batch.execute('DUMMY');
         batch.rawInsert('INSERT INTO Test (name) VALUES (?)', ['item1']);
-        batch.rawQuery('SELECT * FROM Test');
         final results = await batch.commit(continueOnError: true);
+        final selectResult = await db.rawQuery('SELECT * FROM Test');
         // devPrint(results);
         // First result is an exception
         var exception = results[0] as DatabaseException;
@@ -204,7 +204,7 @@ class BatchTestPage extends TestPage {
         // Fourth result is an insert
         expect(results[3], 1);
         // Fifth is a select
-        expect(results[4], [
+        expect(selectResult, [
           {'id': 1, 'name': 'item1'}
         ]);
       } finally {

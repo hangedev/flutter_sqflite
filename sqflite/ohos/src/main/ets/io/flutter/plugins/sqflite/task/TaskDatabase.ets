@@ -23,6 +23,7 @@ import relationalStore from '@ohos.data.relationalStore';
 import { ValueType } from '@ohos.data.ValuesBucket';
 import { BusinessError, deviceInfo } from '@kit.BasicServicesKit';
 import { DatabaseHelper } from '../DatabaseHelper';
+import { Database } from '../Database';
 
 const TAG = 'TaskDatabase';
 
@@ -46,7 +47,6 @@ async function query(context: common.Context, config: relationalStore.StoreConfi
     if (columns == null) {
       columnCount = resultSet.columnCount;
       columns = new Array<string>();
-      rows = new Array<Array<Object>>();
       valuesType = new Array<string>();
       let row: Record<string, ValueType> = resultSet.getRow() as Record<string, ValueType>;
       for (let i = 0; i < columnCount; i++) {
@@ -65,18 +65,47 @@ async function query(context: common.Context, config: relationalStore.StoreConfi
       let rowValue: Object | null = null;
       const valuesTypeItem = valuesType![index];
       if ('number' == valuesTypeItem) {
-        let value = resultSet.getString(index);
-        let isIntegerString = /^-?\d+$/.test(value);
-        if (value && isIntegerString) {
-          let valueBig = BigInt(value);
-          if (valueBig > Number.MAX_SAFE_INTEGER || valueBig < Number.MIN_SAFE_INTEGER) {
-            rowValue = valueBig;
-          } else {
-            rowValue = Number.parseInt(valueBig.toString());
-          }
+        // 策略：优先使用 getValue()，只在大整数时用 getString() 精确处理
+        let directValue = resultSet.getValue(index);
+        
+        // 如果不是 number 类型，直接使用（例如 null）
+        if (typeof directValue !== 'number') {
+          rowValue = directValue;
+        } 
+        // 如果是安全整数范围内的整数，直接使用
+        else if (Number.isInteger(directValue) &&
+                 directValue <= Number.MAX_SAFE_INTEGER && 
+                 directValue >= Number.MIN_SAFE_INTEGER) {
+          rowValue = directValue;
         }
-        else{
-          rowValue = resultSet.getValue(index);
+        // 如果是浮点数（有小数部分），直接使用
+        else if (!Number.isInteger(directValue)) {
+          rowValue = directValue;
+        }
+        // 可能是大整数，用 getString 精确处理
+        else {
+          let value = resultSet.getString(index);
+          if (!value) {
+            rowValue = directValue;
+          } else {
+            // 判断是否为纯整数格式（不包括科学计数法）
+            let isIntegerString = /^-?\d+$/.test(value);
+            if (isIntegerString) {
+              try {
+                let valueBig = BigInt(value);
+                if (valueBig > Number.MAX_SAFE_INTEGER || valueBig < Number.MIN_SAFE_INTEGER) {
+                  rowValue = valueBig;
+                } else {
+                  rowValue = Number.parseInt(value);
+                }
+              } catch (e) {
+                rowValue = directValue;
+              }
+            } else {
+              // 其他情况（包括科学计数法），使用原始数值
+              rowValue = directValue;
+            }
+          }
         }
       } else {
         rowValue = resultSet.getValue(index);
@@ -112,19 +141,28 @@ export async function taskPoolExecuteQuery(context: common.Context, operation: O
     const command: SqlCommand = operation.getSqlCommand();
     const sql: string = command.getSql();
     const sqlArguments: ValueType[] | undefined = operation.getArgument(Constant.PARAM_SQL_ARGUMENTS) as ValueType[];
-    const cursorPageSize: number | undefined = operation.getArgument(Constant.PARAM_CURSOR_PAGE_SIZE) as number;
+    const cursorPageSizeRaw: number | null | undefined = operation.getArgument(Constant.PARAM_CURSOR_PAGE_SIZE);
     const config = getStoreConfig(operation);
+    // 条件1: 游标分页查询（需要保持 ResultSet 打开）
+    const isCursorQuery = typeof cursorPageSizeRaw === 'number' && cursorPageSizeRaw > 0;
+    // 条件2: 在事务中的查询（需要共享同一个 db 连接）
+    const hasTransactionId = !operation.hasNullTransactionId();
+    const inTransaction = hasTransactionId || operation.getInTransactionChange() === true;
+    // 条件3: 用户版本查询（特殊处理）
+    const isUserVersionQuery = sql == Constant.SQL_PRAGMA_USER_VERSION;
 
-    // 查询版本的不使用 taskPool 线程
-    if (sql == Constant.SQL_PRAGMA_USER_VERSION) {
+    // 判断是否需要使用 Database.query
+    if (isUserVersionQuery) {
       const result: Map<String, Object> = new Map<String, Object>();
       result.set(Constant.PARAM_COLUMNS, [Constant.PARAM_USER_VERSION]);
       result.set(Constant.PARAM_ROWS, [[db.version]]);
       operation.success(result);
-    }
-    else{
+    } else if (isCursorQuery || inTransaction) {
+      await Database.query(operation, db);
+    } else {
+      const cursorPageSize = -1; // 普通查询不需要分页
       const task: taskPool.Task =
-        new taskPool.Task(query, context,config, sql, sqlArguments ?? [], cursorPageSize ?? -1);
+        new taskPool.Task(query, context, config, sql, sqlArguments ?? [], cursorPageSize);
       const result: Map<String, Object> = await taskPool.execute(task) as Map<String, Object>;
       operation.success(result);
     }
