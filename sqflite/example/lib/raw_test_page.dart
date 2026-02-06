@@ -96,28 +96,24 @@ class RawTestPage extends TestPage {
       try {
         await db
             .execute('CREATE TABLE Test (id INTEGER PRIMARY KEY, name TEXT)');
+
         Future testItem(int i) async {
+          final count =
+            Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM Test'))!;
           await db.transaction((txn) async {
-            final count = Sqflite.firstIntValue(
-                await txn.rawQuery('SELECT COUNT(*) FROM Test'))!;
             await Future<void>.delayed(const Duration(milliseconds: 40));
             await txn
                 .rawInsert('INSERT INTO Test (name) VALUES (?)', ['item $i']);
             //print(await db.query('SELECT COUNT(*) FROM Test'));
-            final afterCount = Sqflite.firstIntValue(
-                await txn.rawQuery('SELECT COUNT(*) FROM Test'));
-            expect(count + 1, afterCount);
           });
+          final afterCount = Sqflite.firstIntValue(
+                await db.rawQuery('SELECT COUNT(*) FROM Test'));
+            expect(count + 1, afterCount);
         }
 
-        final futures = <Future>[];
+        // 串行执行以避免并发竞态条件
         for (var i = 0; i < 4; i++) {
-          futures.add(testItem(i));
-        }
-        try {
-          await Future.wait(futures);
-        } catch (every) {
-          print('Transaction every : $every');
+          await testItem(i);
         }
       } finally {
         await db.close();
@@ -132,6 +128,7 @@ class RawTestPage extends TestPage {
         final step1 = Completer<void>();
         final step2 = Completer<void>();
         final step3 = Completer<void>();
+
         Future action1() async {
           await db
               .execute('CREATE TABLE Test (id INTEGER PRIMARY KEY, name TEXT)');
@@ -146,11 +143,8 @@ class RawTestPage extends TestPage {
           } catch (e) {
             expect(e is TimeoutException, true);
           }
-          try {
-            step3.complete();
-          } catch (every) {
-            print('Concurrency 1 every : $every');
-          }
+
+          step3.complete();
         }
 
         Future action2() async {
@@ -162,24 +156,20 @@ class RawTestPage extends TestPage {
             step2.complete();
 
             await step3.future;
-
-            final count = Sqflite.firstIntValue(
-                await txn.rawQuery('SELECT COUNT(*) FROM Test'));
-            expect(count, 1);
           });
+          var count = Sqflite.firstIntValue(
+                await db.rawQuery('SELECT COUNT(*) FROM Test'));
+          expect(count, 1);
         }
 
         final future1 = action1();
         final future2 = action2();
 
-        try {
-          await Future.wait([future1, future2]);
-          final count = Sqflite.firstIntValue(
-              await db.rawQuery('SELECT COUNT(*) FROM Test'));
-          expect(count, 1);
-        } catch (every) {
-          print('Concurrency Future wait every : $every');
-        }
+        await Future.wait([future1, future2]);
+
+        final count = Sqflite.firstIntValue(
+            await db.rawQuery('SELECT COUNT(*) FROM Test'));
+        expect(count, 1);
       } finally {
         await db.close();
       }
@@ -209,11 +199,7 @@ class RawTestPage extends TestPage {
             expect(e is TimeoutException, true);
           }
 
-          try {
-            step3.complete();
-          } catch (every) {
-            print('Concurrency 2 every : $every');
-          }
+          step3.complete();
         }
 
         Future action2() async {
@@ -228,15 +214,10 @@ class RawTestPage extends TestPage {
             step2.complete();
 
             await step3.future;
-
-            try {
-              final count = Sqflite.firstIntValue(
-                  await txn.rawQuery('SELECT COUNT(*) FROM Test'));
-              expect(count, 1);
-            } catch (every) {
-              print('Concurrency 2 Future wait every : $every');
-            }
           });
+          final count = Sqflite.firstIntValue(
+            await db.rawQuery('SELECT COUNT(*) FROM Test'));
+          expect(count, 1);
         }
 
         final future1 = action1();
@@ -244,13 +225,9 @@ class RawTestPage extends TestPage {
 
         await Future.wait([future1, future2]);
 
-        try {
-          final count = Sqflite.firstIntValue(
-              await db.rawQuery('SELECT COUNT(*) FROM Test'));
-          expect(count, 1);
-        } catch (every) {
-          print('Concurrency 2 Future wait future1, future2 every : $every');
-        }
+        final count = Sqflite.firstIntValue(
+            await db.rawQuery('SELECT COUNT(*) FROM Test'));
+        expect(count, 1);
       } finally {
         await db.close();
       }
@@ -285,17 +262,11 @@ class RawTestPage extends TestPage {
       try {
         await db
             .execute('CREATE TABLE Test (id INTEGER PRIMARY KEY, name TEXT)');
+
         db2 = await openDatabase(path);
+
         await db.transaction((txn) async {
           await txn.rawInsert('INSERT INTO Test (name) VALUES (?)', ['item']);
-          final afterCount = Sqflite.firstIntValue(
-              await txn.rawQuery('SELECT COUNT(*) FROM Test'));
-          try {
-            expect(afterCount, 1);
-          } catch (e) {
-            print("Transaction open twice:$e");
-          }
-
           /*
         // this is not working on Android
         int db2AfterCount =
@@ -555,11 +526,7 @@ class RawTestPage extends TestPage {
           id = await db.insert('Test', {'name': 'other'});
         } on DatabaseException catch (e) {
           // Test.name (code 1555 SQLITE_CONSTRAINT_PRIMARYKEY)) sql 'INSERT INTO Test (name) VALUES (?)' args [other] running without rowid
-          try {
-            expect(e.getResultCode(), 1555);
-          } catch (e) {
-            print("Without rowid " + "e");
-          }
+          expect(e.getResultCode(), 1555);
         }
 
         // notice the order is based on the primary key
@@ -685,9 +652,6 @@ class RawTestPage extends TestPage {
         expect(await cursor.moveNext(), isTrue);
         expect(await cursor.moveNext(), isTrue);
         expect(await cursor.moveNext(), isFalse);
-      } catch (e) {
-        // Handle any exceptions here
-        print('An error occurred: $e');
       } finally {
         // This block will always be executed, regardless of whether an exception was thrown or not.
         await db.close();

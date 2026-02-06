@@ -22,9 +22,21 @@ import { Constant } from './OhosConstant';
 import { BusinessError } from '@ohos.base';
 import { MethodResult } from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodChannel';
 import MethodCall from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodCall';
+import { SqlErrorInfo } from './operation/SqlErrorInfo';
 import { MethodCallOperation } from './operation/MethodCallOperation';
 import { BatchOperation } from './operation/BatchOperation';
-import { Any } from '@ohos/flutter_ohos';
+import { Any, Log} from '@ohos/flutter_ohos';
+import {
+  AttachHandler,
+  BeginExclusiveHandler,
+  BeginImmediateHandler,
+  CommitHandler,
+  DetachHandler,
+  ISqlHandler,
+  RollbackHandler
+} from './SqlHandler';
+import { deviceInfo } from '@kit.BasicServicesKit';
+
 
 type HandleCallback = (x: Object) => void;
 
@@ -37,6 +49,11 @@ export class Database {
   private static lastTransactionId: number = 0;
   private static currentTransactionId: number | null;
   private static transactionDepth: number = 0;
+  // 跟踪当前事务内创建的表
+  private static transactionCreatedTables: Set<string> = new Set();
+  // 游标管理用于分页查询
+  private static cursorMap: Map<number, relationalStore.ResultSet> = new Map();
+  private static lastCursorId: number = 0;
   constructor(context: common.Context, path: string, id: number, singleInstance: boolean, logLevel: number) {
     this.context = context;
     this.path = path;
@@ -45,7 +62,16 @@ export class Database {
     this.logLevel = logLevel;
   }
 
-  private static enterOrLeaveInTransaction(value: Boolean): void {
+  private static handlers: ISqlHandler[] = [
+    new BeginImmediateHandler(),
+    new CommitHandler(),
+    new RollbackHandler(),
+    new BeginExclusiveHandler(),
+    new AttachHandler(),
+    new DetachHandler()
+  ];
+
+  private static enterOrLeaveInTransaction(value: boolean | null): void {
     if(value == true) {
       Database.transactionDepth++;
     } else if (value == false) {
@@ -53,75 +79,211 @@ export class Database {
     }
   }
 
-  private static handleException(operation: Operation, err: BusinessError<void>) {
-    let code = err.code;
-    let message = err.message;
-    if (code == 801) {
-      message = message + " Database is readonly"
-    }
-    operation.error(Constant.SQLITE_ERROR, 'error code:' + code + '。' + message, '');
+  // 重置事务深度 (关闭数据库时调用)
+  public static resetTransactionDepth(): void {
+    Database.transactionDepth = 0;
+  }
+  
+  // 清空事务内创建的表记录 (提交或回滚时调用)
+  public static clearTransactionCreatedTables(): void {
+    Database.transactionCreatedTables.clear();
   }
 
-  private static async executeOrError(operation: Operation, db: relationalStore.RdbStore, callback?: HandleCallback): Promise<boolean> {
+  private static async handleException(operation: Operation, err: BusinessError<void>, db?: relationalStore.RdbStore): Promise<void> {
+    let code = err.code;
+    let message = err.message;
+    if (code == Constant.RDB_ERROR_CODE_14800000) {
+       // 14800000: 参数错误 - 通常是参数数量与占位符不匹配
+      operation.success(null);
+      return;
+    } else if (code == Constant.RDB_ERROR_CODE_14800021) {
+      Database.handleTableOrSyntaxError(operation, message);
+    } else if (code == Constant.RDB_ERROR_CODE_14800032) {
+      await Database.handleConstraintViolation(operation, db);
+    } else if (code == Constant.RDB_ERROR_CODE_801) {
+      operation.error(Constant.SQLITE_ERROR, 'error code:' + code + '。' + " Database is readonly", SqlErrorInfo.getMap(operation));
+    } else {
+      operation.error(Constant.SQLITE_ERROR, 'error code:' + code + '。' + message, SqlErrorInfo.getMap(operation));
+    }
+  }
+
+    /**
+   * 处理表不存在或语法错误（错误码 14800021）
+   */
+  private static handleTableOrSyntaxError(operation: Operation, message: string): void {
+    let normalizedMessage = message;
+    
+    // 判断表不存在：Insert failed | updated data does not exist | does not exist
+    if (message.includes('Insert failed') || message.includes('updated data does not') || message.includes('does not exist')) {
+      normalizedMessage = Database.normalizeTableNotFoundError(operation, message);
+    } else if (message.includes('not supported') || 
+             (message.includes('Generic error') && !message.includes('Insert failed'))) {
+      // 判断语法错误：not supported 或 纯粹的 Generic error（不包含 Insert failed）
+      normalizedMessage = `syntax error`;
+    }
+    
+    operation.error(Constant.SQLITE_ERROR, normalizedMessage, SqlErrorInfo.getMap(operation));
+  }
+
+  /**
+   * 规范化表不存在错误消息
+   */
+  private static normalizeTableNotFoundError(operation: Operation, message: string): string {
+    // 获取 SQL 语句用于错误类型推断
+    const sql = operation.getSqlCommand()?.getSql() || '';
+    // 从 SQL 中提取表名
+    const tableMatch = sql.match(/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM|FROM|CREATE\s+TABLE)\s+(\w+)/i);
+    
+    if (tableMatch) {
+      const tableName = tableMatch[1];
+      // 检查表名是否为SQLite保留字(完整列表)
+      const reservedWords = Constant.SQL_RESERVED_WORDS;
+      if (reservedWords.some(kw => tableName.toLowerCase() === kw.toLowerCase())) {
+        return `syntax error`;
+      } else {
+        return `no such table: ${tableName}`;
+      }
+    } else {
+      // 无法提取表名时，也返回语法错误
+      return `syntax error`;
+    }
+  }
+
+  /**
+   * 处理唯一约束或主键冲突（错误码 14800032）
+   */
+  private static async handleConstraintViolation(operation: Operation, db?: relationalStore.RdbStore): Promise<void> {
+    const sql = operation.getSqlCommand()?.getSql() || '';
+    let resultCode = Constant.SQLITE_CONSTRAINT_UNIQUE;
+    let errorMessage = 'UNIQUE constraint failed';
+    
+    const insertMatch = sql.match(/INSERT\s+INTO\s+(\w+)\s*\((\w+)\)/i);
+    
+    if (insertMatch && db) {
+      const tableName = insertMatch[1];
+      const columnName = insertMatch[2];
+      
+      // 检查列是否为主键
+      const isPrimaryKey = await Database.checkIfPrimaryKey(db, tableName, columnName);
+      if (isPrimaryKey) {
+        resultCode = Constant.SQLITE_CONSTRAINT_PRIMARYKEY; // 1555
+      }
+      
+      errorMessage = `UNIQUE constraint failed: ${tableName}.${columnName}`;
+    }
+    
+    const finalMessage = `${errorMessage} (code ${resultCode})`;
+    operation.error(Constant.SQLITE_ERROR, finalMessage, SqlErrorInfo.getMap(operation));
+  }
+
+  /**
+   * 检查列是否为主键
+   */
+  private static async checkIfPrimaryKey(db: relationalStore.RdbStore, tableName: string, columnName: string): Promise<boolean> {
+    try {
+      const resultSet = await db.querySql(`PRAGMA table_info(${tableName})`);
+      while (resultSet.goToNextRow()) {
+        const row = resultSet.getRow();
+        if (row['name'] === columnName && row['pk'] === 1) {
+          resultSet.close();
+          return true;
+        }
+      }
+      resultSet.close();
+    } catch (e) {
+      Log.e(Constant.TAG, `Failed to query table_info: ${e}`);
+    }
+    return false;
+  }
+
+  /**
+   * 判断 SQL 是否为 DDL 语句 (需要使用 executeSql 而不是 execute)
+   * @param sql SQL 语句
+   * @returns true 如果是 DDL 语句
+   */
+  private static isDDL(sql: string): boolean {
+    const upperSql = sql.trim().toUpperCase();
+    return upperSql.startsWith('CREATE ') ||
+           upperSql.startsWith('DROP ') ||
+           upperSql.startsWith('ALTER ') ||
+           upperSql.startsWith('TRUNCATE ');
+  }
+
+  private static async executeOrError(operation: Operation, db: relationalStore.RdbStore,
+    callback?: HandleCallback): Promise<boolean> {
     let command: SqlCommand = operation.getSqlCommand();
-    let operationInTransaction: boolean = operation.getInTransactionChange();
     let sqlArguments: ValueType[] | undefined = operation.getArgument(Constant.PARAM_SQL_ARGUMENTS);
     let sql: string = command.getSql();
-    let promise: ValueType;
+    let promise: ValueType | undefined;
     try{
-      if(sqlArguments == undefined || sqlArguments.length < 1) {
-        promise = await db.execute(sql) as ValueType;
+      // DDL 语句(CREATE/DROP/ALTER)需要使用 executeSql
+      const isDDL = Database.isDDL(sql);
+      if (isDDL) {
+        // executeSql 不支持参数，DDL 语句通常也不需要参数
+        await db.executeSql(sql);
+        // 如果在事务内且是CREATE TABLE,记录表名以处理ohos事务隔离问题
+        const transactionId = operation.getTransactionId();
+        if (Database.transactionDepth > 0) {
+          const createMatch = sql.match(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)/i);
+          if (createMatch) {
+            const tableName = createMatch[1];
+            Database.transactionCreatedTables.add(tableName.toLowerCase());
+          }
+        }
+        promise = undefined; // DDL 语句没有返回值
       } else {
-        promise = await db.execute(sql, sqlArguments) as ValueType;
+        if (sqlArguments == undefined || sqlArguments.length < 1) {
+          promise = await db.execute(sql) as ValueType;
+        } else {
+          promise = await db.execute(sql, sqlArguments) as ValueType;
+        }
       }
-
-      Database.enterOrLeaveInTransaction(operationInTransaction);
-      if (callback != undefined) {
-        callback(promise)
+      if (callback != undefined && promise !== undefined) {
+        callback(promise);
       }
       return true;
     } catch(err) {
-      Database.handleException(operation, err);
+      Log.e('Database', `executeOrError failed for err: ${err}`);
+      await Database.handleException(operation, err, db);
       return false;
     }
   }
 
   /// execute
   public static async execute(operation: Operation, db: relationalStore.RdbStore): Promise<void> {
-    let command: SqlCommand = operation.getSqlCommand();
-    let sql: string = command.getSql();
-    let executeSuccess: boolean = false;
-    let inTransactionChange: boolean = operation.getInTransactionChange();
-    let enteringTransaction: boolean = (inTransactionChange == true && operation.hasNullTransactionId());
-    if(enteringTransaction) {
-      Database.currentTransactionId = ++ (Database.lastTransactionId);
+    const sql = operation.getSqlCommand().getSql();
+    const inTransactionChangeValue: object = operation.getArgument<object>(Constant.PARAM_IN_TRANSACTION_CHANGE);
+    const inTransactionChange: boolean | null = (typeof inTransactionChangeValue === 'boolean') ? inTransactionChangeValue as boolean : null;
+    const enteringTransaction: boolean = (inTransactionChange === true) && operation.hasNullTransactionId();
+    
+    if (enteringTransaction) {
+      Database.currentTransactionId = ++(Database.lastTransactionId);
     }
 
-    if(sql == 'BEGIN IMMEDIATE') {
-      db.beginTransaction();
-      Database.enterOrLeaveInTransaction(inTransactionChange);
-      executeSuccess = true;
-      Database.handleExecute(executeSuccess, enteringTransaction, operation, inTransactionChange);
-      return;
-    } else if(sql == 'COMMIT') {
-      db.commit();
-      Database.enterOrLeaveInTransaction(inTransactionChange);
-      executeSuccess = true;
-      Database.handleExecute(executeSuccess, enteringTransaction, operation, inTransactionChange);
-      return;
-    } else if (sql == 'BEGIN EXCLUSIVE') {
-      Database.enterOrLeaveInTransaction(inTransactionChange);
-      executeSuccess = true;
-      Database.handleExecute(executeSuccess, enteringTransaction, operation, inTransactionChange);
-      return;
+    const handler = Database.handlers.find((h) => h.match(sql));
+    let success: boolean;
+      if (handler) {
+        const result = handler.execute(sql, operation, db);
+        success = result instanceof Promise ? await result : result;
+      } else {
+        success = await Database.executeOrError(operation, db);
+      }
+    
+    if (handler?.needsPostProcess ?? true) {
+      if (success && inTransactionChange !== null) {
+        Database.enterOrLeaveInTransaction(inTransactionChange);        
+        // 如果是离开事务(COMMIT或ROLLBACK)，清空该事务创建表的记录
+        if (inTransactionChange === false) {
+          Database.clearTransactionCreatedTables();
+        }
+      }
+      Database.handleExecute(success, enteringTransaction, operation, inTransactionChange);
     }
-
-    executeSuccess = await Database.executeOrError(operation, db);
-    Database.handleExecute(executeSuccess, enteringTransaction, operation, inTransactionChange);
   }
 
-  private static handleExecute(executeSuccess: boolean, enteringTransaction: boolean, operation: Operation, inTransactionChange: Boolean) {
-    if(!executeSuccess) {
+  private static handleExecute(executeSuccess: boolean, enteringTransaction: boolean, operation: Operation,
+    inTransactionChange: boolean | null) {
+    if (!executeSuccess) {
       // Revert if needed
       if(enteringTransaction) {
         Database.currentTransactionId = null;
@@ -158,18 +320,29 @@ export class Database {
   }
 
   private static async doInsert(operation: Operation, db: relationalStore.RdbStore): Promise<boolean> {
+    let rowIdResult: number = 0; 
+    // 使用 callback 捕获 executeOrError 返回的 rowId
     let executeSuccess: boolean = await Database.executeOrError(operation, db, (rowId) => {
-      operation.success(rowId);
+      rowIdResult = rowId as number;
     });
-    if(!executeSuccess) {
+    if (!executeSuccess) {
       return false;
     }
 
-    // don't get last id if not expected
-    if(operation.getNoResult()) {
+    // 如果不需要返回结果，直接返回 null
+    if (operation.getNoResult()) {
       operation.success(null);
       return true;
     }
+    
+    // 如果 rowId <= 0 (比如 ON CONFLICT IGNORE),直接返回 0
+    if (rowIdResult <= 0) {
+      operation.success(0);
+      return true;
+    }
+    
+    // 正常情况,返回 executeOrError 已经设置的 rowId
+    operation.success(rowIdResult);
     return true;
   }
 
@@ -195,91 +368,253 @@ export class Database {
   }
 
   /// query
-  public static query(operation: Operation, db: relationalStore.RdbStore): void {
+  public static async query(operation: Operation, db: relationalStore.RdbStore): Promise<void> {
     Database.doQuery(operation, db);
   }
 
-  private static async doQuery(operation: Operation, db: relationalStore.RdbStore): Promise<boolean> {
+  /// queryCursorNext - 获取游标的下一页数据
+  public static queryCursorNext(operation: Operation): void {
+    const cursorId: number = operation.getArgument(Constant.PARAM_CURSOR_ID);
+    const cancel: boolean = operation.getArgument(Constant.PARAM_CANCEL) ?? false;
+    
+    // 如果是取消操作，关闭并删除游标
+    if (cancel) {
+      Database.closeCursor(cursorId);
+      operation.success(null);
+      return;
+    }
+    
+    // 获取保存的 ResultSet
+    const resultSet = Database.cursorMap.get(cursorId);
+    if (!resultSet) {
+      operation.error(Constant.SQLITE_ERROR, `Cursor not found: ${cursorId}`, SqlErrorInfo.getMap(operation));
+      return;
+    }
+    
+    const cursorPageSize: number | undefined = operation.getArgument(Constant.PARAM_CURSOR_PAGE_SIZE);
+    let cursorHasMoreData = false;
+    
+    try {
+      // 继续读取下一页数据
+      let results = Database.handleQuerySqlResult(resultSet, cursorPageSize);
+      
+      // 判断是否还有更多数据
+      cursorHasMoreData = !resultSet.isAtLastRow;
+      
+      if (cursorHasMoreData) {
+        // 继续保存 cursorId
+        results.set(Constant.PARAM_CURSOR_ID, cursorId as Object);
+      }
+      
+      operation.success(results);
+    } catch (err) {
+      Database.handleException(operation, err as BusinessError<void>);
+      cursorHasMoreData = false;
+    } finally {
+      // 没有更多数据时关闭游标
+      if (!cursorHasMoreData) {
+        Database.closeCursor(cursorId);
+      }
+    }
+  }
+  
+  /// closeCursor - 关闭并删除游标
+  private static closeCursor(cursorId: number): void {
+    const resultSet = Database.cursorMap.get(cursorId);
+    if (resultSet) {
+      try {
+        resultSet.close();
+        Database.cursorMap.delete(cursorId);
+      } catch (err) {
+        Log.e('Database', `Error closing cursor ${cursorId}: ${err}`);
+      }
+    }
+  }
 
+  /**
+   * 处理用户版本查询
+   */
+  private static handleUserVersionQuery(operation: Operation, db: relationalStore.RdbStore): boolean {
+    try {
+      let versionMap: Map<String, object> = new Map<String, object>();
+      versionMap.set(Constant.PARAM_COLUMNS, ['user_version']);
+      versionMap.set(Constant.PARAM_ROWS, [[db.version]]);
+      operation.success(versionMap);
+      return true;
+    } catch (err) {
+      Database.handleException(operation, err);
+      Log.e('Database', `doQuery err ${err}`);
+      return false;
+    }
+  }
+
+  /**
+   * 执行 SQL 查询并返回 ResultSet
+   */
+  private static async executeQuery(sql: string, sqlArguments: ValueType[] | undefined, db: relationalStore.RdbStore): Promise<relationalStore.ResultSet> {
+    if (sqlArguments != undefined) {
+      return await db.querySql(sql, sqlArguments);
+    } else {
+      return await db.querySql(sql);
+    }
+  }
+
+  /**
+   * 验证查询结果，检查表是否存在
+   */
+  private static validateQueryResult(operation: Operation, resultSet: relationalStore.ResultSet, sql: string): boolean {
+    // querySql 在表不存在或SQL语法错误时不会抛出异常，而是返回 columnCount=0 的空结果，需要检测这种情况并主动抛出异常
+    if (resultSet.columnCount === 0) {
+      return Database.handleEmptyResultSet(operation, sql);
+    }
+    return true;
+  }
+
+  /**
+   * 处理空结果集（表不存在或语法错误）
+   */
+  private static handleEmptyResultSet(operation: Operation, sql: string): boolean {
+    const tableMatch = sql.match(/FROM\s+(\w+)/i);
+    
+    if (tableMatch) {
+      const tableName = tableMatch[1];
+      const tableNameLower = tableName.toLowerCase();
+      
+      // 检查表是否在当前事务内创建
+      if (Database.transactionDepth <= 0 || !Database.transactionCreatedTables.has(tableNameLower)) {
+        const reservedTableNames = ['table', 'index', 'group', 'order', 'select', 'where'];
+        const isReservedTableName = reservedTableNames.includes(tableNameLower);
+        
+        const errorMessage = isReservedTableName ? 'Generic error' : `Table does not exist: ${tableName}`;
+        Database.handleException(operation, {
+          code: Constant.RDB_ERROR_CODE_14800021,
+          message: errorMessage
+        } as BusinessError<void>);
+        return false;
+      }
+    } else {
+      // 无法提取表名，说明SQL语法错误
+      Database.handleException(operation, {
+        code: Constant.RDB_ERROR_CODE_14800021,
+        message: `syntax error`
+      } as BusinessError<void>);
+      return false;
+    }
+    
+    return true;
+  }
+
+  /**
+   * 处理游标分页（保存 ResultSet 以便后续分页）
+   */
+  private static handleCursorPagination(resultSet: relationalStore.ResultSet, cursorPageSize: number | undefined, results: Map<String, object>): number | null {
+    // 判断是否需要保存 ResultSet
+    let cursorHasMoreData = false;
+    if (cursorPageSize != null && cursorPageSize > 0) {
+      cursorHasMoreData = !resultSet.isAtLastRow;
+    }
+
+    if (cursorHasMoreData) {
+      // 保存 ResultSet
+      Database.lastCursorId++;
+      const savedCursorId = Database.lastCursorId;
+      Database.cursorMap.set(savedCursorId, resultSet);
+      results.set(Constant.PARAM_CURSOR_ID, savedCursorId as Object);
+      return savedCursorId;
+    }
+    
+    return null;
+  }
+
+  private static async doQuery(operation: Operation, db: relationalStore.RdbStore): Promise<boolean> {
     let command: SqlCommand = operation.getSqlCommand();
     let sql: string = command.getSql();
 
-    if(sql == 'PRAGMA user_version') {
-      try{
-        let versionMap: Map<String, object> = new Map<String, object>();
-        versionMap.set(Constant.PARAM_COLUMNS, ['user_version']);
-        versionMap.set(Constant.PARAM_ROWS, [[db.version]]);
-        operation.success(versionMap);
-        return true;
-      } catch(error){
-        Database.handleException(operation,error);
-        return false;
-      }
+    // 特殊处理：用户版本查询
+    if (sql == Constant.SQL_PRAGMA_USER_VERSION) {
+      return Database.handleUserVersionQuery(operation, db);
     }
 
     let cursorPageSize: number | undefined = operation.getArgument(Constant.PARAM_CURSOR_PAGE_SIZE);
     let sqlArguments: ValueType[] | undefined = operation.getArgument(Constant.PARAM_SQL_ARGUMENTS);
-    let suc: boolean = false;
+    let resultSet: relationalStore.ResultSet | null = null;
+    let savedCursorId: number | null = null;
 
-    if(sqlArguments != undefined && sqlArguments.length > 0) {
-      try{
-        let resultSet = await db.querySql(sql, sqlArguments);
-        suc = Database.handleQuerySqlResult(operation, resultSet, cursorPageSize);
-        return suc;
-      } catch(err) {
-        Database.handleException(operation, err);
+    try {
+      // 执行查询
+      resultSet = await Database.executeQuery(sql, sqlArguments, db);
+
+      // 验证查询结果
+      if (!Database.validateQueryResult(operation, resultSet, sql)) {
         return false;
       }
-    } else {
-      try{
-        let resultSet = await db.querySql(sql);
-        suc = Database.handleQuerySqlResult(operation, resultSet, cursorPageSize);
-        return suc;
-      } catch(err) {
-        Database.handleException(operation, err);
-        return false;
+
+      // 读取数据
+      let results = Database.handleQuerySqlResult(resultSet, cursorPageSize);
+
+      // 处理游标分页
+      savedCursorId = Database.handleCursorPagination(resultSet, cursorPageSize, results);
+
+      operation.success(results);
+      return true;
+
+    } catch (err) {
+      Log.e('Database', `doQuery caught exception: code=${(err as BusinessError<void>).code}, message=${(err as BusinessError<void>).message}`);
+      Database.handleException(operation, err);
+      // 异常时清理
+      if (savedCursorId != null) {
+        Database.cursorMap.delete(savedCursorId);
+      }
+      return false;
+    } finally {
+      // 如果没有保存，就关闭 ResultSet
+      if (savedCursorId == null && resultSet != null) {
+        resultSet.close();
       }
     }
   }
 
-  private static handleQuerySqlResult(operation: Operation, resultSet: relationalStore.ResultSet, cursorPageSize: number | undefined): boolean {
-
+  private static handleQuerySqlResult(resultSet: relationalStore.ResultSet,
+    cursorPageSize: number | undefined): Map<String, object> {
     let results: Map<String, object> = new Map<String, Object>();
     let rows: Array<Array<Object>> = new Array<Array<Object>>();
     let columns: Array<string> | null = null;
+    let valuesType: Array<string> | null = null;
     let columnCount: number = 0;
 
     // resultSet是一个数据集合得游标，默认值想第-1个记录，有效的数据从0开始
-    while(resultSet.goToNextRow()) {
+    while (resultSet.goToNextRow()) {
       if(columns == null) {
         columnCount = resultSet.columnCount;
         columns = new Array<string>();
-        rows = new Array<Array<Object>>();
-        let data: Record<string, ValueType> = resultSet.getRow() as Record<string, ValueType>;
-        for(let i = 0; i < columnCount; i++) {
+        valuesType = new Array<string>();
+        let row: Record<string, ValueType> = resultSet.getRow() as Record<string, ValueType>;
+        for (let i = 0; i < columnCount; i++) {
           let columnName = resultSet.getColumnName(i);
           columns.push(columnName);
+          let valueType: string = typeof row[columnName];
+          valuesType.push(valueType);
         }
         results.set(Constant.PARAM_COLUMNS, columns);
         results.set(Constant.PARAM_ROWS, rows);
       }
 
-      let row = Database.cursorRowToList(resultSet, columnCount);
+      let row = Database.cursorRowToList(resultSet, columnCount, valuesType);
       rows.push(row);
-      if(cursorPageSize != null) {
-        if(rows.length >= cursorPageSize) {
+
+      // 分页支持：读够指定数量后停止
+      if (cursorPageSize != null && cursorPageSize > 0) {
+        if (rows.length >= cursorPageSize) {
           break;
         }
       }
     }
 
-    operation.success(results);
-    // 释放数据集的内存
-    resultSet.close();
-    return true;
+    return results;
   }
 
-  static cursorRowToList(cursor: relationalStore.ResultSet, length: number): Array<Object> {
+  static cursorRowToList(cursor: relationalStore.ResultSet, length: number,
+    valuesType: Array<string> | null): Array<Object> {
     let list = new Array<Object>();
 
     for(let i = 0; i < length; i++) {
@@ -318,6 +653,7 @@ export class Database {
           } else if(continueOnError) {
             operation.handleErrorContinue(results);
           } else {
+            operation.handleError(result);
             return;
           }
           break;

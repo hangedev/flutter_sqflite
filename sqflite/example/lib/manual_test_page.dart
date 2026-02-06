@@ -149,14 +149,8 @@ class _ManualTestPageState extends State<ManualTestPage> {
       }, summary: 'Verbose logs, for debugging'),
       SqfMenuItem('Get info', () async {
         final factory = databaseFactory as impl.SqfliteDatabaseFactoryMixin;
-        try {
-          final info = await Future.any([
-            factory.getDebugInfo(),
-            Future.delayed(Duration(seconds: 5), () => throw Exception('Operation timed out'))
-          ]).timeout(Duration(seconds: 5));
-        } on Exception catch (e) {
-          print('Error: ${e}');
-        }
+        final info = await factory.getDebugInfo();
+        print(info.toString());
       }, summary: 'Implementation info (dev only)'),
       SqfMenuItem('Increment version', () async {
         print(await _incrementVersion());
@@ -173,27 +167,13 @@ class _ManualTestPageState extends State<ManualTestPage> {
     ];
   }
 
-  Future<Database> initDatabase() async {
-    if (ISPlatform.Platform.operatingSystem == 'ohos') {
-      final path = await initDeleteDb('big_blob.db');
-      var db = await openDatabase(path, version: 1,
-          onCreate: (Database db, int version) async {
-        await db
-            .execute('CREATE TABLE Test (id INTEGER PRIMARY KEY, value BLOB)');
-      });
-      return db;
-    } else {
-      var db = await openDatabase(inMemoryDatabasePath, version: 1,
-          onCreate: (Database db, int version) async {
-        await db
-            .execute('CREATE TABLE Test (id INTEGER PRIMARY KEY, value BLOB)');
-      });
-      return db;
-    }
-  }
-
   Future<void> testBigBlog(int size) async {
-    var db = await initDatabase();
+    // await Sqflite.devSetDebugModeOn(true);
+    var db = await openDatabase(inMemoryDatabasePath, version: 1,
+        onCreate: (Database db, int version) async {
+      await db
+          .execute('CREATE TABLE Test (id INTEGER PRIMARY KEY, value BLOB)');
+    });
     try {
       var blob =
           Uint8List.fromList(List.generate(size, (index) => index % 256));

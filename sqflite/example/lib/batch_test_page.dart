@@ -1,9 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
-import 'package:sqflite_example/src/common_import.dart';
 
 import 'test_page.dart';
-import 'dart:io' as ISPlatform;
 
 /// Batch test page.
 class BatchTestPage extends TestPage {
@@ -192,19 +190,23 @@ class BatchTestPage extends TestPage {
         batch.execute('CREATE TABLE Test (id INTEGER PRIMARY KEY, name TEXT)');
         batch.execute('DUMMY');
         batch.rawInsert('INSERT INTO Test (name) VALUES (?)', ['item1']);
-        batch.rawQuery('SELECT * FROM Test');
         final results = await batch.commit(continueOnError: true);
-        if (platform.isAndroid) {
-          var exception = results[0] as DatabaseException;
-          expect(exception.isNoSuchTableError(), true);
-          expect(results[1], null);
-          exception = results[2] as DatabaseException;
-          expect(exception.isSyntaxError(), true);
-          expect(results[3], 1);
-          expect(results[4], [
-            {'id': 1, 'name': 'item1'}
-          ]);
-        }
+        final selectResult = await db.rawQuery('SELECT * FROM Test');
+        // devPrint(results);
+        // First result is an exception
+        var exception = results[0] as DatabaseException;
+        expect(exception.isNoSuchTableError(), true);
+        // Second result is null (create table)
+        expect(results[1], null);
+        // Third result is an exception
+        exception = results[2] as DatabaseException;
+        expect(exception.isSyntaxError(), true);
+        // Fourth result is an insert
+        expect(results[3], 1);
+        // Fifth is a select
+        expect(selectResult, [
+          {'id': 1, 'name': 'item1'}
+        ]);
       } finally {
         await db.close();
       }

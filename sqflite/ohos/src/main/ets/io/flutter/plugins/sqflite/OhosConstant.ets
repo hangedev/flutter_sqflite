@@ -52,7 +52,7 @@ export class Constant {
   // For queryCursorNext. Integer
   static PARAM_CURSOR_ID: string = "cursorId";
   // For queryCursorNext. Integer
-  public PARAM_CANCEL: string = "cancel";
+  public static PARAM_CANCEL: string = "cancel";
   // in each operation
   static PARAM_METHOD: string = "method";
   // Batch operation results
@@ -91,4 +91,25 @@ export class Constant {
   static ERROR_DATABASE_CLOSED: string = "database_closed";// msg
   // memory database path
   static MEMORY_DATABASE_PATH: string = ":memory:";
+  static SQL_BEGIN_IMMEDIATE: string = "BEGIN IMMEDIATE";
+  static SQL_COMMIT: string = "COMMIT";
+  static SQL_ROLLBACK: string = "ROLLBACK";
+  static SQL_BEGIN_EXCLUSIVE: string = "BEGIN EXCLUSIVE";
+  static SQL_ATTACH: string = "ATTACH";
+  static SQL_DETACH: string = "DETACH";
+  static SQL_PRAGMA_USER_VERSION = "PRAGMA user_version";
+  static API_20 = 20;
+  static RDB_ERROR_CODE_801 = 801;
+  static RDB_ERROR_CODE_14800000 = 14800000;
+  static RDB_ERROR_CODE_14800021 = 14800021;
+  static RDB_ERROR_CODE_14800032 = 14800032;
+  static SQLITE_CONSTRAINT_UNIQUE = 2067;
+  static SQLITE_CONSTRAINT_PRIMARYKEY = 1555;
+  static SQL_RESERVED_WORDS: string[] = ['add', 'all', 'alter', 'and', 'as', 'autoincrement', 'between', 
+    'case', 'check', 'collate', 'commit', 'constraint', 'create', 'default', 'deferrable', 
+    'delete', 'distinct', 'drop', 'else', 'escape', 'except', 'exists', 'foreign', 'from', 
+    'group', 'having', 'if', 'in', 'index', 'insert', 'intersect', 'into', 'is', 'isnull', 
+    'join', 'limit', 'not', 'notnull', 'null', 'on', 'or', 'order', 'primary', 'references', 
+    'select', 'set', 'table', 'then', 'to', 'transaction', 'union', 'unique', 'update', 
+    'using', 'values', 'when', 'where'];
 }

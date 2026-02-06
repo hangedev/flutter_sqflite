@@ -11,7 +11,6 @@ import 'package:sqflite/src/factory_mixin.dart' // ignore: implementation_import
         SqfliteDatabaseFactoryMixin;
 import 'package:sqflite_example/utils.dart';
 import 'package:synchronized/synchronized.dart';
-import 'dart:io' as ISPlatform;
 
 import 'src/common_import.dart';
 import 'test_page.dart';
@@ -725,50 +724,27 @@ class OpenTestPage extends TestPage {
     });
 
     test('In memory database', () async {
-      if (ISPlatform.Platform.operatingSystem == 'ohos') {
-        final path = await initDeleteDb('not_in_memory.db');
-        var db = await openDatabase(path);
-        await db
-            .execute('CREATE TABLE IF NOT EXISTS Test(id INTEGER PRIMARY KEY)');
-        await db.insert('Test', {'id': 1});
-        expect(await db.query('Test'), [
-          {'id': 1}
-        ]);
-        await db.close();
-        db = await openDatabase(path);
-        expect(await db.query('Test'), [
-          {'id': 1}
-        ]);
-        try {
-          await db.query('Test');
-        } on DatabaseException catch (e) {
-          print(e);
-        }
-        await db.close();
-      } else {
-        const inMemoryPath =
-            inMemoryDatabasePath; // tried null without success, as it crashes on Android
-        const path = inMemoryPath;
+      const inMemoryPath = inMemoryDatabasePath; // tried null without success, as it crashes on Android
+      const path = inMemoryPath;
 
-        var db = await openDatabase(path);
-        await db
-            .execute('CREATE TABLE IF NOT EXISTS Test(id INTEGER PRIMARY KEY)');
-        //这里有问题，要兼容In memory database
-        await db.insert('Test', {'id': 1});
-        expect(await db.query('Test'), [
-          {'id': 1}
-        ]);
-        await db.close();
-        // reopen, content should be gone
-        db = await openDatabase(path);
-        try {
-          await db.query('Test');
-          fail('fail');
-        } on DatabaseException catch (e) {
-          print(e);
-        }
-        await db.close();
+      var db = await openDatabase(path);
+      await db.execute('CREATE TABLE IF NOT EXISTS Test(id INTEGER PRIMARY KEY)');
+      //这里有问题，要兼容In memory database
+      await db.insert('Test', {'id': 1});
+      expect(await db.query('Test'), [
+        {'id': 1}
+      ]);
+      await db.close();
+
+      // reopen, content should be gone
+      db = await openDatabase(path);
+      try {
+        await db.query('Test');
+        fail('fail');
+      } on DatabaseException catch (e) {
+        print(e);
       }
+      await db.close();
     });
 
     test('Not in memory database', () async {
@@ -927,39 +903,26 @@ class OpenTestPage extends TestPage {
           expect(await readFileAsString(path), 'dummy');
         }
 
-        expect(await isDatabase(path), isFalse);
-        // try read-write
-        const minExpectedSize = 1000;
-        expect((await readFileAsBytes(path)).length, lessThan(minExpectedSize));
-        late Database db;
-        if (ISPlatform.Platform.operatingSystem == 'ohos') {
-          try {
-            db = await factory.openDatabase(path);
-          } on DatabaseException catch (e) {
-             // Ohos Failed to open the database because it is corrupted
-            const ohosCorruptedCode = '14800011';
-            var isCorruptedError =  e.toString().contains('Failed to open the database because it is corrupted') &&  e.toString().contains(ohosCorruptedCode);
-            expect(isCorruptedError, isTrue);
-            return;
-          }
-        } else {
-          db = await factory.openDatabase(path);
-        }
       
-        var versionShouldFail =
-            !supportsCompatMode || platform.isIOS || platform.isMacOS;
-        if (versionShouldFail) {
-          // On iOS it fails
-          try {
-            await db.getVersion();
-          } catch (e) {
-            print('getVersion error');
-          }
-        } else {
-          // On Android the database is re-created
+      expect(await isDatabase(path), isFalse);
+      // try read-write
+      const minExpectedSize = 1000;
+      expect((await readFileAsBytes(path)).length, lessThan(minExpectedSize));
+
+      var db = await factory.openDatabase(path);
+      var versionShouldFail = !supportsCompatMode || platform.isIOS || platform.isMacOS;
+      if (versionShouldFail) {
+        // On iOS it fails
+        try {
           await db.getVersion();
+        } catch (e) {
+          print('getVersion error');
         }
-        await db.close();
+      } else {
+        // On Android the database is re-created
+        await db.getVersion();
+      }
+      await db.close();
 
         if (versionShouldFail) {
           // On iOS it fails
