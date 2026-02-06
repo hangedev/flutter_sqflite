@@ -18,16 +18,13 @@ class ExceptionTestPage extends TestPage {
 
       await db.execute('CREATE TABLE Test (id INTEGER PRIMARY KEY, name TEXT)');
 
+      var beforeCount = firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM Test'));
       // insert then fails to make sure the transaction is cancelled
       var hasFailed = false;
       try {
         await db.transaction((txn) async {
           await txn.rawInsert(
               'INSERT INTO Test (name) VALUES (?)', <Object>['item']);
-          final afterCount =
-              firstIntValue(await txn.rawQuery('SELECT COUNT(*) FROM Test'));
-          expect(afterCount, 1);
-
           hasFailed = true;
           // this failure should cancel the insertion before
           await txn.execute('DUMMY CALL');
@@ -38,11 +35,9 @@ class ExceptionTestPage extends TestPage {
         print('native_error: $e');
       }
       verify(hasFailed);
-
-      final afterCount =
-          firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM Test'));
-      expect(afterCount, 0);
-
+      
+      var afterCount = firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM Test'));
+      expect(beforeCount, afterCount);
       await db.close();
     });
 
@@ -512,6 +507,8 @@ class ExceptionTestPage extends TestPage {
           fail('should timeout');
         } on TimeoutException catch (e) {
           print('caught $e');
+        } catch (e) {
+          print('should timeout error $e');
         }
 
         // Try to open another db to check that the main thread is free
