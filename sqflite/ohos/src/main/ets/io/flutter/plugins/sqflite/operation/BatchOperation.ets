@@ -57,7 +57,7 @@ export class BatchOperation extends BaseOperation {
     errorDetail.set(Constant.PARAM_ERROR_CODE, this.operationResult.errorCode);
     errorDetail.set(Constant.PARAM_ERROR_MESSAGE, this.operationResult.errorMessage);
     errorDetail.set(Constant.PARAM_ERROR_DATA, this.operationResult.errorData);
-    error.set(Constant.PARAM_ERROR_DATA, errorDetail);
+    error.set(Constant.PARAM_ERROR, errorDetail);
     return error;
   }
 
