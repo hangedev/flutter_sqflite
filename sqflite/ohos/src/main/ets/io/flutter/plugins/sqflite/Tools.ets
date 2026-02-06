@@ -23,5 +23,10 @@ export class Tools {
      }
      return originEndString == endString;
    }
+   
+  static startsWithIgnoreCase(str: string, prefix: string): boolean {
+    let pattern = new RegExp("^" + prefix, "i");
+    return pattern.test(str);
+  }
 }
 

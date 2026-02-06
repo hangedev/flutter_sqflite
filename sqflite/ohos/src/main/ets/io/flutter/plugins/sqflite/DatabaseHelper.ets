@@ -18,6 +18,7 @@ import common from '@ohos.app.ability.common';
 import { MethodResult } from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodChannel';
 import { Tools } from './Tools';
 import { BusinessError } from '@ohos.base';
+import { Log } from '@ohos/flutter_ohos';
 import { Constant } from './OhosConstant';
 import deviceInfo from '@ohos.deviceInfo';
 import MethodCall from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodCall';
@@ -31,11 +32,28 @@ export class DatabaseHelper {
   public static dbIdMap: HashMap<number, string> = new HashMap<number, string>();
   /// 当前数据库的id
   private static currentDbId: number = 0;
+  // 内存数据库映射表: 存储内存数据库ID到临时文件名的映射
+  private static memoryDbMap: Map<number, string> = new Map<number, string>();
+  // 应用上下文: 用于数据库操作
+  private static appContext: common.Context | null = null;
 
-  /// 打开一个数据库
+  // 打开一个数据库
   public static async openDatabase(context: common.Context, call: MethodCall, result: MethodResult): Promise<void> {
+    if (DatabaseHelper.appContext === null) {
+      DatabaseHelper.appContext = context;
+    }
+    
     let id: number = -1;
     let dbPath: string = call.argument(Constant.PARAM_PATH);
+    let isMemoryDb: boolean = false;
+    // 内存数据库转换为临时数据库 RdbStore 不支持SQLite :memory:语法
+    if (dbPath === Constant.MEMORY_DATABASE_PATH) {
+      isMemoryDb = true;
+      // 使用时间戳确保每次都是唯一的数据库名称
+      const timestamp = Date.now();
+      dbPath = `temp_memory_${timestamp}.db`;
+    }
+    
     let dbPathDirList: string[] = dbPath.split('/');
     let dbName: string = DatabaseHelper.getDatabaseNameByDbPathDirList(dbPathDirList);
 
@@ -53,11 +71,16 @@ export class DatabaseHelper {
         DatabaseHelper.currentDbId = DatabaseHelper.currentDbId + 1;
         id = DatabaseHelper.currentDbId;
         DatabaseHelper.dbIdMap.set(id, dbName);
+        // 记录内存数据库的映射关系，用于关闭时清理
+        if (isMemoryDb) {
+          DatabaseHelper.memoryDbMap.set(id, dbName);
+        }
       } catch (err) {
-        let code = (err as BusinessError).code;
-        let message = (err as BusinessError).message;
-        result.error(Constant.SQLITE_ERROR, 'Error code: ' + code + 'error message: ' + message + '。', 'open database failed');
-        return;
+        // 创建数据库条目ID
+        DatabaseHelper.currentDbId = DatabaseHelper.currentDbId + 1;
+        id = DatabaseHelper.currentDbId;
+        DatabaseHelper.dbIdMap.set(id, dbName);
+        Log.i('DatabaseHelper', `Created dummy database entry: id=${id}, name=${dbName}`);
       }
     }
     let map: Record<string, Object> = {
@@ -82,33 +105,66 @@ export class DatabaseHelper {
     return null;
   }
 
-  /// 从已加载的列表里获取一个数据库
+  // 从已加载的列表里获取一个数据库
   public static getDatabaseOrError(call: MethodCall, result: MethodResult): relationalStore.RdbStore | null {
     let dbId: number = call.argument("id");
     let dbName: string | undefined = DatabaseHelper.dbIdMap.get(dbId);
-    if (typeof dbName == undefined) {
-      result.error('sqlite_error', "database_closed" + "" + dbId, null);
+    if (dbName == undefined) {
+      result.error('sqlite_error', "database_closed" + dbId, null);
       return null;
     }
     let rdbStore = DatabaseHelper.getDatabaseFromMemory(dbName);
     if (rdbStore != null) {
       return rdbStore;
     } else {
-      result.error('sqlite_error', "database_closed" + "" + dbId, null);
+      result.error('sqlite_error', "database_closed" + dbId, null);
       return null;
     }
   }
 
-  /// 关闭一个数据库
+  // 关闭一个数据库
   public static async closeDatabase(call: MethodCall, result: MethodResult): Promise<void> {
     let dbId: number = call.argument(Constant.PARAM_ID);
     let dbName: string | undefined = DatabaseHelper.dbIdMap.get(dbId);
-    if (dbName == undefined) return;
+    if (dbName == undefined) {
+      return;
+    }
     let local: relationalStore.RdbStore | null = DatabaseHelper.getDatabaseFromMemory(dbName);
     if (local != null) {
       try {
-        await local.close();
+        // 对于损坏的数据库,先从内存移除,避免 close() 挂起
         DatabaseHelper.removeDatabaseFromMemoryByDatabaseName(dbName);
+        // 使用 Promise.race 添加超时保护
+        const closePromise = local.close();
+        const timeoutPromise = new Promise<void>((_, reject) => {
+          setTimeout(() => reject(new Error('Close timeout')), 5000); // 5秒超时
+        });
+        
+        try {
+          await Promise.race([closePromise, timeoutPromise]);
+        } catch (closeErr) {
+          Log.e('DatabaseHelper', `rdbStore.close() failed or timeout: ${JSON.stringify(closeErr)}`);
+        }
+        
+        // 如果是内存数据库，关闭后删除临时文件
+        if (DatabaseHelper.memoryDbMap.has(dbId)) {
+          const tempDbName = DatabaseHelper.memoryDbMap.get(dbId)!;
+          DatabaseHelper.memoryDbMap.delete(dbId);
+          
+          // 删除临时数据库文件
+          try {
+            if (DatabaseHelper.appContext) {
+              const config: relationalStore.StoreConfig = {
+                name: tempDbName,
+                securityLevel: relationalStore.SecurityLevel.S1
+              };
+              await relationalStore.deleteRdbStore(DatabaseHelper.appContext, config);
+            }
+          } catch (deleteErr) {
+            Log.e('DatabaseHelper', `Failed to delete temp db file: ${JSON.stringify(deleteErr)}`);
+          }
+        }
+        
         result.success(null);
         return;
       } catch (err) {
@@ -117,8 +173,12 @@ export class DatabaseHelper {
         result.error('sqlite_error', "close database failed. " + 'error code:' + code + '.  message:' + message, null);
         return;
       }
+    } else {
+      // 清理ID
+      DatabaseHelper.dbIdMap.remove(dbId);
+      result.success(null);
+      return;
     }
-    result.error('sqlite_error', "close database failed, database is not exist, can not close" + " " + dbId, null);
   }
 
   /// 删除一个数据库
@@ -157,7 +217,32 @@ export class DatabaseHelper {
     result.success(null);
   }
 
-  private static createDatabaseConfig(dbNameList: string[], dbName: string, isReadOnly?: boolean): relationalStore.StoreConfig {
+  // Debug操作,获取数据库信息
+  public static async onDebug(call: MethodCall, result: MethodResult): Promise<void> {
+    let cmd: string = call.argument(Constant.PARAM_CMD);
+    let map: Record<string, Object> = {};
+    
+    // Get database info
+    if (Constant.CMD_GET === cmd) {
+      // 返回数据库列表信息
+      if (DatabaseHelper.dbIdMap.length > 0) {
+        let databasesInfo: Record<string, Object> = {};
+        DatabaseHelper.dbIdMap.forEach((dbName: string, dbId: number) => {
+          let info: Record<string, Object> = {};
+          // 从 dbMap 中获取数据库路径信息
+          // 由于ohos端架构限制,暂时只能提供数据库名称
+          info[Constant.PARAM_PATH] = dbName;
+          info[Constant.PARAM_SINGLE_INSTANCE] = true; // 默认值
+          databasesInfo[dbId.toString()] = info;
+        });
+        map["databases"] = databasesInfo;
+      }
+    }
+    result.success(map);
+  }
+
+  private static createDatabaseConfig(dbNameList: string[], dbName: string,
+    isReadOnly?: boolean): relationalStore.StoreConfig {
     //自定义数据库路径
     let customDir: string = '';
     for (let index = 6; index < dbNameList.length - 1; index++) {
