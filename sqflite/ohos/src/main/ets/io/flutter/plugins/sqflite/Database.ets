@@ -626,50 +626,19 @@ export class Database {
   }
 
   static cursorValue(cursor: relationalStore.ResultSet, index: number, valueType: Any | null): Any {
-    if ('number' == valueType) {
-      // 策略：优先使用 getValue()，只在大整数时用 getString() 精确处理
-      let directValue = cursor.getValue(index);
-      
-      // 如果不是 number 类型，直接返回（例如 null）
-      if (typeof directValue !== 'number') {
-        return directValue;
-      }
-      
-      // 如果是安全整数范围内的整数，直接返回
-      if (Number.isInteger(directValue) &&
-          directValue <= Number.MAX_SAFE_INTEGER && 
-          directValue >= Number.MIN_SAFE_INTEGER) {
-        return directValue;
-      }
-      
-      // 如果是浮点数（有小数部分），直接返回
-      if (!Number.isInteger(directValue)) {
-        return directValue;
-      }
-      
-      // 可能是大整数，用 getString 精确处理
+    if ('number' === valueType) {
       let value = cursor.getString(index);
-      if (!value) {
-        return directValue;
-      }
-      
-      // 判断是否为纯整数格式（不包括科学计数法）
-      let isIntegerString = /^-?\d+$/.test(value);
-      if (isIntegerString) {
-        try {
+      if(value) {
+        let isIntegerString = /^-?\d+$/.test(value);
+        if (isIntegerString) {
           let valueBig = BigInt(value);
           if (valueBig > Number.MAX_SAFE_INTEGER || valueBig < Number.MIN_SAFE_INTEGER) {
             return valueBig;
           } else {
-            return Number.parseInt(value);
+            return cursor.getValue(index);
           }
-        } catch (e) {
-          return directValue;
         }
       }
-      
-      // 其他情况（包括科学计数法），返回原始数值
-      return directValue;
     }
     return cursor.getValue(index);
   }
