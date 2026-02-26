@@ -67,6 +67,29 @@ class TypeTestPage extends TestPage {
       await data.db.close();
     });
 
+    test('double', () async {
+      //await Sqflite.devSetDebugModeOn(true);
+      final path = await initDeleteDb('type_double.db');
+      data.db = await openDatabase(path, version: 1,
+          onCreate: (Database db, int version) async {
+        await db
+            .execute('CREATE TABLE Test (id INTEGER PRIMARY KEY, value double)');
+      });
+      var id = await insertValue(-1.1);
+      expect(await getValue(id), -1.1);
+
+      id = await insertValue(198379342429.1);
+      final num = await getValue(id) as double;
+      expect(num, 198379342429.1);
+
+      id = await insertValue(pow(2, 32) + .1);
+      final num1 = await getValue(id) as double;
+      final num2 = await getValue(id) as double;
+      expect(num1, num2);
+
+      await data.db.close();
+    });
+
     test('real', () async {
       //await Sqflite.devSetDebugModeOn(true);
       final path = await initDeleteDb('type_real.db');
