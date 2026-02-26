@@ -87,12 +87,12 @@ flutter pub get
 
 #### **存储类型**
 
-| Name   | Description  | Type   | **ohos Support** |
-| ------ | ------------ | ------ | ---------------- |
-| String | 存储字符串值 | String | yes              |
-| int    | 存储整数值   | int    | yes              |
-| double | 存储浮点数值 | double | yes              |
-| bool   | 存储布尔值   | bool   | yes              |
+| Name   | Description | Type   | **ohos Support** |
+|--------|-------------|--------| ---------------- |
+| String | 存储字符串值  | String | yes              |
+| int    | 存储整数值    | int    | yes              |
+| real   | 存储浮点数值  | double | yes              |
+| null   | 空          | null   | yes              |
 
 #### OpenDatabaseOptions
 
@@ -164,7 +164,11 @@ flutter pub get
 
 
 ## 6. 其他
+- DateTime 不是 SQLite 支持的类型。可以把它们存为 int（自纪元以来的毫秒数）或 string（ISO8601 格式）。
 
+- bool 不是 SQLite 支持的类型。可以使用 INTEGER 并用 0 和 1 表示。
+
+- 在 sqflite 中，double 类型和 REAL 类型指的是同一个东西，使用 DOUBLE 或 REAL 来声明列，在数据库的存储方式是相同的。
 ## 7. 开源协议
 
 本项目基于 [BSD 2-Clause License](https://gitcode.com/openharmony-sig/flutter_sqflite/blob/br_v2.3.3+1_ohos/LICENSE)，请自由地享受和参与开源。
