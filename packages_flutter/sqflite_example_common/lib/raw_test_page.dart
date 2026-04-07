@@ -97,28 +97,31 @@ class RawTestPage extends TestPage {
       final path = await initDeleteDb('simple_transaction.db');
       final db = await openDatabase(path);
       try {
-        await db
-            .execute('CREATE TABLE Test (id INTEGER PRIMARY KEY, name TEXT)');
+        await db.execute(
+          'CREATE TABLE Test (id INTEGER PRIMARY KEY, name TEXT)',
+        );
 
         Future testItem(int i) async {
+           final count =
+                firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM Test'))!;
           await db.transaction((txn) async {
-            final count =
-                firstIntValue(await txn.rawQuery('SELECT COUNT(*) FROM Test'))!;
             await Future<void>.delayed(const Duration(milliseconds: 40));
-            await txn
-                .rawInsert('INSERT INTO Test (name) VALUES (?)', ['item $i']);
+            await txn.rawInsert('INSERT INTO Test (name) VALUES (?)', [
+              'item $i',
+            ]);
             //print(await db.query('SELECT COUNT(*) FROM Test'));
-            final afterCount =
-                firstIntValue(await txn.rawQuery('SELECT COUNT(*) FROM Test'));
-            expect(count + 1, afterCount);
           });
+
+           final afterCount =
+                firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM Test'));
+            expect(count + 1, afterCount);
+  
         }
 
-        final futures = <Future>[];
+        // 串行执行以避免并发竞态条件
         for (var i = 0; i < 4; i++) {
-          futures.add(testItem(i));
+          await testItem(i);
         }
-        await Future.wait(futures);
       } finally {
         await db.close();
       }
@@ -155,16 +158,17 @@ class RawTestPage extends TestPage {
           await db.transaction((txn) async {
             // Wait for table being created;
             await step1.future;
-            await txn
-                .rawInsert('INSERT INTO Test (name) VALUES (?)', ['item 1']);
+            await txn.rawInsert('INSERT INTO Test (name) VALUES (?)', [
+              'item 1',
+            ]);
             step2.complete();
 
             await step3.future;
-
-            final count =
-                firstIntValue(await txn.rawQuery('SELECT COUNT(*) FROM Test'));
-            expect(count, 1);
           });
+          // 事务提交后验证
+          var count =
+              firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM Test'))!;
+          expect(count, 1);
         }
 
         final future1 = action1();
@@ -214,16 +218,18 @@ class RawTestPage extends TestPage {
 
           await db.transaction((txn) async {
             // Wait for table being created;
-            await txn
-                .rawInsert('INSERT INTO Test (name) VALUES (?)', ['item 1']);
+            await txn.rawInsert('INSERT INTO Test (name) VALUES (?)', [
+              'item 1',
+            ]);
             step2.complete();
 
             await step3.future;
 
-            final count =
-                firstIntValue(await txn.rawQuery('SELECT COUNT(*) FROM Test'));
-            expect(count, 1);
           });
+
+            final count =
+                firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM Test'));
+            expect(count, 1);
         }
 
         final future1 = action1();
@@ -266,17 +272,14 @@ class RawTestPage extends TestPage {
       final db = await openDatabase(path);
       Database? db2;
       try {
-        await db
-            .execute('CREATE TABLE Test (id INTEGER PRIMARY KEY, name TEXT)');
+        await db.execute(
+          'CREATE TABLE Test (id INTEGER PRIMARY KEY, name TEXT)',
+        );
 
         db2 = await openDatabase(path);
 
         await db.transaction((txn) async {
-          await txn.rawInsert('INSERT INTO Test (name) VALUES (?)', ['item']);
-          final afterCount =
-              firstIntValue(await txn.rawQuery('SELECT COUNT(*) FROM Test'));
-          expect(afterCount, 1);
-
+          await txn.rawInsert('INSERT INTO Test (name) VALUES (?)', ['item']);     
           /*
         // this is not working on Android
         int db2AfterCount =

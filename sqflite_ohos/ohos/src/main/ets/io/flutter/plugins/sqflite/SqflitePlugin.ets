@@ -66,6 +66,9 @@ export default class SqflitePlugin implements FlutterPlugin, MethodCallHandler {
       case Constant.METHOD_QUERY:
         this.handleQueryCall(call, result);
         break;
+      case Constant.METHOD_QUERY_CURSOR_NEXT:
+        this.handleQueryCursorNextCall(call, result);
+        break;
       case Constant.METHOD_UPDATE:
         this.handleUpdateCall(call, result);
         break;
@@ -74,6 +77,9 @@ export default class SqflitePlugin implements FlutterPlugin, MethodCallHandler {
         break;
       case Constant.METHOD_OPTIONS:
         this.handleOptionsCall(call, result);
+        break;
+      case Constant.METHOD_DEBUG:
+        this.handleDebugCall(call, result);
         break;
       case Constant.METHOD_DEBUG_MODE:
         this.handleDebugModeCall(call, result);
@@ -145,6 +151,12 @@ export default class SqflitePlugin implements FlutterPlugin, MethodCallHandler {
     Database.query(operation, rdbStore);
   }
 
+  ///查询游标下一页数据
+  async handleQueryCursorNextCall(call: MethodCall, result: MethodResult): Promise<void> {
+    let operation: MethodCallOperation = new MethodCallOperation(call, result);
+    Database.queryCursorNext(operation);
+  }
+
   ///更新（包括删除）数据
   async handleUpdateCall(call: MethodCall, result: MethodResult): Promise<void> {
     let rdbStore = DatabaseHelper.getDatabaseOrError(call, result);
@@ -170,6 +182,11 @@ export default class SqflitePlugin implements FlutterPlugin, MethodCallHandler {
     DatabaseHelper.options(call, result);
   }
 
+  ///Debug操作，获取数据库信息
+  async handleDebugCall(call: MethodCall, result: MethodResult): Promise<void> {
+    DatabaseHelper.onDebug(call, result);
+  }
+
   ///设置debug模式，已废弃
   async handleDebugModeCall(call: MethodCall, result: MethodResult): Promise<void> {
     DatabaseHelper.debugMode(call, result);
@@ -186,6 +203,8 @@ export default class SqflitePlugin implements FlutterPlugin, MethodCallHandler {
     if (rdbStore == null) {
       return;
     }
+    // 关闭数据库前重置事务深度,避免多个数据库共享静态变量
+    Database.resetTransactionDepth();
     await DatabaseHelper.closeDatabase(call, result);
   }
 

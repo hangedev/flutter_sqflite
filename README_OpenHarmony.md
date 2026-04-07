@@ -20,6 +20,7 @@ dependencies:
     git:
       url: "https://gitcode.com/openharmony-sig/flutter_sqflite.git"
       path: ./sqflite
+      ref: "br_v2.4.2_ohos"
 ```
 
 Execute Command
@@ -159,7 +160,6 @@ Open  `entry/src/main/resources/base/element/string.json` and add the following 
 
 ## 5. Known Issues
 
-- [ ]  memory database ohos not adapted
 - [ ]  ohos  When query results contain excessively large datasets, serialization failures occur due to taskPool limitations, preventing normal data return. : [issue#75](https://gitcode.com/openharmony-sig/flutter_sqflite/issues/75).
 
 ## 6. Others
