@@ -87,11 +87,11 @@ flutter pub get
 #### **存储类型**
 
 | Name   | Description  | Type   | **ohos Support** |
-| ------ | ------------ | ------ | ---------------- |
+|--------| ------------ |--------|------------------|
 | String | 存储字符串值 | String | yes              |
 | int    | 存储整数值   | int    | yes              |
-| double | 存储浮点数值 | double | yes              |
-| bool   | 存储布尔值   | bool   | yes              |
+| real   | 存储浮点数值 | double | yes              |
+| null	  | 空		   | null   |yes               |
 
 #### OpenDatabaseOptions
 
@@ -160,6 +160,11 @@ flutter pub get
 - [ ]  ohos 当前查询返回数据量特别大时，受 taskPool 限制，导致 序列化失败，无法正常返回数据。 : [issue#75](https://gitcode.com/openharmony-sig/flutter_sqflite/issues/75)。
 
 ## 6. 其他
+- DateTime 不是 SQLite 支持的类型。可以把它们存为 int（自纪元以来的毫秒数）或 string（ISO8601 格式）。
+
+- bool 不是 SQLite 支持的类型。可以使用 INTEGER 并用 0 和 1 表示。
+
+- 在 sqflite 中，double 类型和 REAL 类型指的是同一个东西，使用 DOUBLE 或 REAL 来声明列，在数据库的存储方式是相同的。
 
 ## 7. 开源协议
 
