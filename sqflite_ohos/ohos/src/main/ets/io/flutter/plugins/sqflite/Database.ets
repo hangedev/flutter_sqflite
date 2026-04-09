@@ -626,15 +626,17 @@ export class Database {
   }
 
   static cursorValue(cursor: relationalStore.ResultSet, index: number, valueType: Any | null): Any {
-    if ('number' == valueType) {
+    if ('number' === valueType) {
       let value = cursor.getString(index);
-      let isIntegerString = /^-?\d+$/.test(value);
-      if (value && isIntegerString) {
-        let valueBig = BigInt(value);
-        if (valueBig > Number.MAX_SAFE_INTEGER || valueBig < Number.MIN_SAFE_INTEGER) {
-          return valueBig;
-        } else {
-          return Number.parseInt(valueBig.toString());
+      if(value) {
+        let isIntegerString = /^-?\d+$/.test(value);
+        if (isIntegerString) {
+          let valueBig = BigInt(value);
+          if (valueBig > Number.MAX_SAFE_INTEGER || valueBig < Number.MIN_SAFE_INTEGER) {
+            return valueBig;
+          } else {
+            return cursor.getValue(index);
+          }
         }
       }
     }

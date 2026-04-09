@@ -87,11 +87,11 @@ Open  `entry/src/main/resources/base/element/string.json` and add the following 
 #### Storage type
 
 | Name   | Description                 | Type   | **ohos Support** |
-| ------ | --------------------------- | ------ | ---------------- |
+|--------|-----------------------------|--------| ---------------- |
 | String | Store string values         | String | yes              |
 | int    | Store integer values        | int    | yes              |
-| double | Store floating-point values | double | yes              |
-| bool   | Store boolean values        | bool   | yes              |
+| real   | Store floating-point values | double | yes              |
+| null   | Store null values           | null   | yes              |
 
 #### OpenDatabaseOptions
 
@@ -162,6 +162,11 @@ Open  `entry/src/main/resources/base/element/string.json` and add the following 
 - [ ]  ohos  When query results contain excessively large datasets, serialization failures occur due to taskPool limitations, preventing normal data return. : [issue#75](https://gitcode.com/openharmony-sig/flutter_sqflite/issues/75).
 
 ## 6. Others
+- DateTime is not a supported SQLite type. you can store them as int (millisSinceEpoch) or string (iso8601).
+
+- bool is not a supported SQLite type. Use INTEGER and 0 and 1 values.
+
+- In sqflite, the double type and REAL type refer to the same thing. Using DOUBLE or REAL to declare a column results in the same storage method in the database.
 
 ## 7.**License**
 
