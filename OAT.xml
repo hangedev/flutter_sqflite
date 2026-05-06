@@ -34,9 +34,30 @@
                 <filteritem type="filepath" name="sqflite/ohos/oh_modules/" desc="oh_modules编译程序，不影响兼容性"/>
                 <filteritem type="filepath" name="sqflite/tripartite/sqflite_common/doc/" desc="说明文件，不影响兼容性"/>
                 <filteritem type="filepath" name="sqflite/example/ohos/hvigor/hvigor-wrapper.js" desc="hvigorw编译程序，不影响兼容性"/>
+                <filteritem type="filename" name="BuildProfile.ets" desc="本地插件,不影响兼容性"/>
+                <filteritem type="filename" name="LICENSE" desc="第三方开源软件LICENSE，不修改版权头，以防有修改版权风险"/>
+                <filteritem type="filename" name="*.yaml" desc="第三方开源软件代码，不修改版权头，以防有修改版权风险"/>
+                <filteritem type="filepath" name=".*/android/.*" desc="第三方开源软件代码，不修改版权头，以防有修改版权风险"/>
+                <filteritem type="filepath" name=".*/darwin/.*" desc="第三方开源软件代码，不修改版权头，以防有修改版权风险"/>
+                <filteritem type="filepath" name=".*/doc/.*" desc="第三方开源软件代码，不修改版权头，以防有修改版权风险"/>
+                <filteritem type="filepath" name=".*/android/.*" desc="第三方开源软件代码，不修改版权头，以防有修改版权风险"/>
+                <filteritem type="filepath" name=".*/lib/.*" desc="第三方开源软件代码，不修改版权头，以防有修改版权风险"/>
+                <filteritem type="filepath" name=".*/test/.*" desc="第三方开源软件代码，不修改版权头，以防有修改版权风险"/>
+                <filteritem type="filepath" name=".*/assets/.*" desc="第三方开源软件代码，不修改版权头，以防有修改版权风险"/>
+                <filteritem type="filepath" name=".*/integration_test/.*" desc="第三方开源软件代码，不修改版权头，以防有修改版权风险"/>
+                <filteritem type="filepath" name=".*/test_driver/.*" desc="第三方开源软件代码，不修改版权头，以防有修改版权风险"/>
+                <filteritem type="filepath" name=".*/tool/.*" desc="第三方开源软件代码，不修改版权头，以防有修改版权风险"/>
+                <filteritem type="filepath" name="packages_web/.*" desc="第三方开源软件代码，不修改版权头，以防有修改版权风险"/>
+                <filteritem type="filepath" name="packages/.*" desc="第三方开源软件代码，不修改版权头，以防有修改版权风险"/>
+                <filteritem type="filepath" name="sqflite_common/.*" desc="第三方开源软件代码，不修改版权头，以防有修改版权风险"/>
+                <filteritem type="filepath" name="sqflite_common_ffi/.*" desc="第三方开源软件代码，不修改版权头，以防有修改版权风险"/>
+                <filteritem type="filepath" name="sqflite_common_test/.*" desc="第三方开源软件代码，不修改版权头，以防有修改版权风险"/>
+                <filteritem type="filepath" name="sqflite_support/.*" desc="第三方开源软件代码，不修改版权头，以防有修改版权风险"/>
+                <filteritem type="filepath" name="sqflite_test_app/.*" desc="第三方开源软件代码，不修改版权头，以防有修改版权风险"/>
             </filefilter>
             <filefilter name="defaultPolicyFilter" desc="Filters for compatibility，license header policies">
                 <filteritem type="filepath" name="sqflite/example/ohos/hvigor/hvigor-wrapper.js" desc="hvigorw编译程序，不影响兼容性"/>
+                <filteritem type="filename" name="LICENSE" desc="第三方开源软件LICENSE，不修改版权头，以防有修改版权风险"/>
             </filefilter>
             <filefilter name="copyrightPolicyFilter" desc="Filters for copyright header policies">
             </filefilter>

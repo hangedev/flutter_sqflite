@@ -163,7 +163,7 @@ flutter pub get
 - [ ] ohos 当前查询返回数据量特别大时，受 taskPool 限制，导致 序列化失败，无法正常返回数据[issue#75](https://gitcode.com/openharmony-sig/flutter_sqflite/issues/75)
 
 
-## 6. 其他
+## 6. 其它
 - DateTime 不是 SQLite 支持的类型。可以把它们存为 int（自纪元以来的毫秒数）或 string（ISO8601 格式）。
 
 - bool 不是 SQLite 支持的类型。可以使用 INTEGER 并用 0 和 1 表示。
