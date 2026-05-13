@@ -20,6 +20,7 @@ dependencies:
     git:
       url: "https://gitcode.com/openharmony-sig/flutter_sqflite.git"
       path: ./sqflite
+      ref: "br_v2.4.2_ohos"
 ```
 
 Execute Command
@@ -41,6 +42,7 @@ For use cases  [sqflite/example](./sqflite/example)
 This document is verified based on the following versions:
 
 1. Flutter: 3.27.5-ohos-0.0.1; SDK: 5.0.0(12); IDE: DevEco Studio: 5.1.0.828; ROM: 5.1.0.130 SP8;
+2. Flutter: 3.35.8-ohos-0.0.1; SDK: 6.0.2(22); IDE: DevEco Studio: 6.0.2.640; ROM: 6.0.0.328 SP22;
 
 ### 2.2 **Permission Requirements**
 
@@ -159,7 +161,6 @@ Open  `entry/src/main/resources/base/element/string.json` and add the following 
 
 ## 5. Known Issues
 
-- [ ]  memory database ohos not adapted
 - [ ]  ohos  When query results contain excessively large datasets, serialization failures occur due to taskPool limitations, preventing normal data return. : [issue#75](https://gitcode.com/openharmony-sig/flutter_sqflite/issues/75).
 
 ## 6. Others

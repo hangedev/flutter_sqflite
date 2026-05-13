@@ -20,6 +20,7 @@ dependencies:
     git:
       url: "https://gitcode.com/openharmony-sig/flutter_sqflite.git"
       path: ./sqflite
+      ref: "br_v2.4.2_ohos"
 ```
 
 执行命令
@@ -41,6 +42,7 @@ flutter pub get
 在以下版本中已测试通过
 
 1. Flutter: 3.27.5-ohos-0.0.1; SDK: 5.0.0(12); IDE: DevEco Studio: 5.1.0.828; ROM: 5.1.0.130 SP8;
+2. Flutter: 3.35.8-ohos-0.0.1; SDK: 6.0.2(22); IDE: DevEco Studio: 6.0.2.640; ROM: 6.0.0.328 SP22;
 
 ### 2.2 权限要求
 
@@ -158,8 +160,6 @@ flutter pub get
 | get length                                                   | int                   | 获取累计操作数量       | function | yes              |
 
 ## 5. 遗留问题
-
-- [ ] memory database ohos未适配
 
 - [ ] ohos 当前查询返回数据量特别大时，受 taskPool 限制，导致 序列化失败，无法正常返回数据[issue#75](https://gitcode.com/openharmony-sig/flutter_sqflite/issues/75)
 
