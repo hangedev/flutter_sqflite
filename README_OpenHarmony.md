@@ -2,7 +2,7 @@
   <h1 align="center"> <code>flutter_sqflite</code> </h1>
 </p>
 
-This project is based on  [sqflite@2.2.8+3](https://pub.dev/packages/sqflite/versions/2.2.8+3).
+This project is based on  [sqflite@2.4.2](https://pub.dev/packages/sqflite/versions/2.4.2).
 
 ## 1. Installation and Usage
 
