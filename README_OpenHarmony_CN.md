@@ -1,171 +1,392 @@
 <p align="center">
-  <h1 align="center"> <code>flutter_sqflite</code> </h1>
+  <h1 align="center">sqflite</h1>
 </p>
 
 本项目基于 [sqflite@2.2.8+3](https://pub.dev/packages/sqflite/versions/2.2.8+3) 开发。
 
-## 1. 安装与使用
+## 简介
 
-### 1.1 安装方式
+sqflite 是 SQLite 的 [Flutter 插件](https://flutter.io)，提供嵌入式 SQL 数据库能力。
+* 支持事务和批量操作
+* 打开时自动进行版本管理
+* 提供插入/查询/更新/删除操作的辅助方法
 
-进入到工程目录并在 pubspec.yaml 中添加以下依赖：
+## 下载安装
 
-<!-- tabs:start -->
-
-#### pubspec.yaml
+在工程的 pubspec.yaml 中添加依赖:
 
 ```yaml
 dependencies:
   sqflite:
     git:
-      url: "https://gitcode.com/openharmony-sig/flutter_sqflite.git"
-      path: ./sqflite
+      url: "https://gitcode.com/CPF-Flutter/flutter_sqflite.git"
+      path: sqflite
 ```
 
-执行命令
+执行命令：
 
 ```bash
 flutter pub get
 ```
 
-<!-- tabs:end -->
+## 约束与限制
 
-### 1.2 使用案例
+### 兼容性
 
-使用案例详见 [sqflite/example](./sqflite/example)
+在以下版本中已测试通过：
 
-## 2. 约束与限制
+- Flutter: 3.7.12-ohos-1.0.6; DevEco Studio: 5.0.13.200; SDK: 5.0.0(12); ROM: 5.1.0.120 SP3;
 
-### 2.1 兼容性
+### 权限要求
 
-在以下版本中已测试通过
+> 以下权限中包含 `system_basic` 权限。默认应用等级为 `normal`，仅允许使用 `normal` 权限，可能在安装 HAP 时出现错误码 9568289。请参考 [安装 HAP 失败提示 9568289](https://developer.huawei.com/consumer/cn/doc/harmonyos-guides-V5/bm-tool-V5#ZH-CN_TOPIC_0000001884757326__%E5%AE%89%E8%A3%85hap%E6%97%B6%E6%8F%90%E7%A4%BAcode9568289-error-install-failed-due-to-grant-request-permissions-failed)，将应用等级调整为 `system_basic`。
 
-1. Flutter: 3.7.12-ohos-1.0.6; SDK: 5.0.0(12); IDE: DevEco Studio: 5.0.13.200; ROM: 5.1.0.120 SP3;
 
-### 2.2 权限要求
+## 使用示例
 
-以下权限中有`system_basic` 权限，而默认的应用权限是 `normal` ，只能使用 `normal` 等级的权限，所以可能会在安装hap包时报错**9568289**，请参考 [文档](https://developer.huawei.com/consumer/cn/doc/harmonyos-guides-V5/bm-tool-V5#ZH-CN_TOPIC_0000001884757326__%E5%AE%89%E8%A3%85hap%E6%97%B6%E6%8F%90%E7%A4%BAcode9568289-error-install-failed-due-to-grant-request-permissions-failed) 修改应用等级为 `system_basic`
+```dart
+import 'package:path/path.dart' as p;
+import 'package:sqflite/sqflite.dart';
 
-####  2.2.1在 entry 目录下的module.json5中添加权限
-
-打开 `entry/src/main/module.json5`，添加：
-
-```yaml
-"requestPermissions": [
-  {
-   "name": "ohos.permission.INTERNET",
-    "reason": "$string:network_reason",
-    "usedScene": {
-      "abilities": [
-        "EntryAbility"
-      ],
-      "when":"inuse"
-    }
-  },
-]
-```
-
-####  2.2.2在 entry 目录下添加申请以上权限的原因
-
-打开 `entry/src/main/resources/base/element/string.json`，添加：
-
-```yaml
-{
-  "string": [
-    {
-      "name": "network_reason",
-      "value": "使用网络"
+Future\<void\> runDemo() async {
+  final String dbPath = p.join(await getDatabasesPath(), 'demo.db');
+  final Database db = await openDatabase(
+    dbPath,
+    version: 1,
+    onCreate: (Database db, int version) async {
+      await db.execute(
+        'CREATE TABLE user(id INTEGER PRIMARY KEY, name TEXT, age INTEGER)',
+      );
     },
-  ]
+  );
+
+  final int id = await db.insert('user', <String, Object?>{
+    'name': 'Alice',
+    'age': 18,
+  });
+
+  final List<Map<String, Object?>> rows = await db.query(
+    'user',
+    where: 'id = ?',
+    whereArgs: <Object?>[id],
+  );
+
+  print('rows: $rows'); // [{id: 1, name: Alice, age: 18}]
+  await db.close();
 }
 ```
 
-## 3. 属性
+更多示例请参考 [sqflite/example](./sqflite/example)。
 
-> [!TIP] "ohos Support"列为 yes 表示 ohos 平台支持该属性；no 则表示不支持；partially 表示部分支持。使用方法跨平台一致，效果对标 iOS 或 Android 的效果。
+## 使用说明
 
-#### **存储类型**
+导入 `sqflite.dart`
+```dart
+import 'package:sqflite/sqflite.dart';
+```
 
-| Name   | Description  | Type   | **ohos Support** |
-|--------| ------------ |--------|------------------|
-| String | 存储字符串值 | String | yes              |
-| int    | 存储整数值   | int    | yes              |
-| real   | 存储浮点数值 | double | yes              |
-| null	  | 空		   | null   |yes               |
+### 打开数据库
 
-#### OpenDatabaseOptions
+SQLite 数据库是文件系统中的一个通过路径标识的文件。如果是相对路径，则该路径相对于通过 `getDatabasesPath()` 获取的路径，这是 OpenHarmony 上的默认数据库目录。
 
-| Name           | Description              | Type                       | **ohos Support** |
-| -------------- | ------------------------ | -------------------------- | ---------------- |
-| version        | 数据库版本               | int?                       | yes              |
-| onConfigure    | 数据库配置回调           | OnDatabaseConfigureFn?     | yes              |
-| onCreate       | 数据库首次创建回调       | OnDatabaseCreateFn?        | yes              |
-| onUpgrade      | 数据库版本升级回调       | OnDatabaseVersionChangeFn? | yes              |
-| onDowngrade    | 数据库版本降级回调       | OnDatabaseVersionChangeFn? | yes              |
-| onOpen         | 数据库成功打开回调       | OnDatabaseOpenFn?          | yes              |
-| readOnly       | 是否以只读模式打开数据库 | bool?                      | yes              |
-| singleInstance | 是否强制单例模式         | bool?                      | yes              |
+```dart
+var db = await openDatabase('my_db.db');
+```
 
-## 4. API
+在打开文件时，有一个基本的迁移机制来处理模式变更。
 
-> [!TIP] "ohos Support"列为 yes 表示 ohos 平台支持该属性；no 则表示不支持；partially 表示部分支持。使用方法跨平台一致，效果对标 iOS 或 Android 的效果。
+许多应用程序使用一个数据库，并且可能永远不会需要关闭它（当应用程序终止时，它将被关闭）。如果你想释放资源，可以关闭数据库。
+
+```dart
+await db.close();
+```
+
+* 查看 [更多关于开启数据库的信息](https://github.com/tekartik/sqflite/blob/master/sqflite/doc/opening_db.md)
+* 完整 [迁移示例](https://github.com/tekartik/sqflite/blob/master/sqflite/doc/migration_example.md)
+
+### 增删改查
+
+以下示例中 `db` 为已打开的 Database 实例。
+
+```dart
+await db.insert('user', <String, Object?>{'name': 'Bob', 'age': 20});
+final List<Map<String, Object?>> list = await db.query('user');
+await db.update('user', <String, Object?>{'age': 21}, where: 'name = ?', whereArgs: <Object?>['Bob']);
+await db.delete('user', where: 'name = ?', whereArgs: <Object?>['Bob']);
+```
+
+占位符参数建议统一使用 `?` + `whereArgs`/`arguments`，避免字符串拼接。
+SQL 细节与常见陷阱详见 [sql.md](https://github.com/tekartik/sqflite/blob/master/sqflite/doc/sql.md)。
+
+### 事务
+
+```dart
+await db.transaction((txn) async {
+  await txn.insert('user', <String, Object?>{'name': 'Tom', 'age': 19});
+  await txn.update(
+    'user',
+    <String, Object?>{'age': 20},
+    where: 'name = ?',
+    whereArgs: <Object?>['Tom'],
+  );
+});
+```
+
+事务中应使用 `txn` 访问数据库；在事务回调里直接使用 `db` 可能导致死锁。
+
+### 批处理
+
+```dart
+final Batch batch = db.batch();
+batch.insert('user', <String, Object?>{'name': 'Cathy', 'age': 22});
+batch.update('user', <String, Object?>{'age': 23}, where: 'name = ?', whereArgs: <Object?>['Cathy']);
+await batch.commit();
+```
+
+大批量写入且不关心每条结果时可使用：
+
+```dart
+await batch.commit(noResult: true);
+```
+
+需要失败后继续执行可使用：
+
+```dart
+await batch.commit(continueOnError: true);
+```
+
+### 读取结果说明
+
+`query`/`rawQuery` 返回的结果列表及其元素 Map 为只读对象。
+若需在内存中修改，请先拷贝：
+
+```dart
+final List<Map<String, Object?>> rows = await db.query('user');
+final Map<String, Object?> mutable = Map<String, Object?>.from(rows.first);
+mutable['age'] = 30;
+```
+
+### 支持的SQLite类型
+
+目前尚不对数值进行有效性检查，因此请避免使用不支持的类型。[https://www.sqlite.org/datatype3.html](https://www.sqlite.org/datatype3.html)
+
+`DateTime` 不支持SQLite类型，建议存储为 int（millisSinceEpoch）或字符串（iso8601）。
+
+`bool` 不支持SQLite类型。请使用 0 和 1 作为值。
+
+关于支持类型的更多信息 [请见此处](https://github.com/tekartik/sqflite/blob/master/sqflite/doc/supported_types.md).
+
+| 名称 | 描述 | 类型 | OpenHarmony 平台支持 |
+| --- | --- | --- | --- |
+| INTEGER | 存储整数值 | int | yes |
+| REAL | 存储浮点数值 | num/double | yes |
+| TEXT | 存储文本值 | String | yes |
+| BLOB | 存储二进制值 | Uint8List | yes |
+| NULL | 空值 | null | yes |
+
+## 接口说明
+
+> “OpenHarmony 平台支持”列中，yes 表示支持，no 表示不支持，partially 表示部分支持。
+
+
+### API
+| 名称                   | 类型 | 参数类型                                                              | 返回值                           | OpenHarmony 平台支持 | 描述 |
+|----------------------| --- |-------------------------------------------------------------------|-------------------------------| --- | --- |
+| openDatabase         | 方法 | String path, [OpenDatabaseOptions](#opendatabaseoptions)? options | Future<[Database](#database)> | yes | 打开指定路径的数据库，可配置打开选项 |
+| openReadOnlyDatabase | 方法 | String path, {bool singleInstance = true}                         | Future<[Database](#database)> | yes | 以只读模式打开指定路径下的数据库 |
+| getDatabasesPath     | 方法 | -                                                                 | Future\<String\>              | yes | 获取数据库默认存储路径 |
+| deleteDatabase       | 方法 | String path                                                       | Future\<void\>                | yes | 删除指定路径的数据库 |
+| databaseExists       | 方法 | String path                                                       | Future\<bool\>                | yes | 检查指定路径的数据库是否存在 |
+
+
+#### Batch
+
+| 名称         | 类型 | 参数类型                                                     | 返回值                   | OpenHarmony 平台支持 | 描述 |
+|------------| --- |----------------------------------------------------------|-----------------------|------------------| --- |
+| get length | 方法 | -                                                        | int                   | yes              | 获取累计操作数量 |
+| apply      | 方法 | {bool? noResult, bool? continueOnError}                  | Future<List<Object?>> | yes              | 执行并提交批量操作，建议优先使用 [commit] 来运行批次，而不是此方法 |
+| commit     | 方法 | {bool? exclusive, bool? noResult, bool? continueOnError} | Future<List<Object?>> | yes              | 提交并执行批量操作，返回每项结果 |
+| delete     | 方法 | String table, String? where, List<Object?>? whereArgs    | void                  | yes              | 在批处理中排队删除操作 |
+| execute    | 方法 | String sql, List<Object?>? arguments                     | void                  | yes              | 在批处理中排队执行任意 SQL 语句 |
+| insert     | 方法 | [InsertOption](#insertoption)                            | void                  | yes              | 在批处理中排队插入操作 |
+| query      | 方法 | [QueryOption](#queryoption)                              | void                  | yes              | 在批处理中排队查询操作 |
+| rawDelete  | 方法 | String sql, List<Object?>? arguments                     | void                  | yes              | 在批处理中排队原始删除语句 |
+| rawInsert  | 方法 | String sql, List<Object?>? arguments                     | void                  | yes              | 在批处理中排队原始插入语句 |
+| rawQuery   | 方法 | String sql, List<Object?>? arguments                     | void                  | yes              | 在批处理中排队原始查询语句 |
+| rawUpdate  | 方法 | String sql, List<Object?>? arguments                     | void                  | yes              | 在批处理中排队原始更新语句 |
+| update     | 方法 | [UpdateOption](#updateoption)                            | void                  | yes              | 在批处理中排队更新操作 |
+
+#### Database
+继承自[DatabaseExecutor](#databaseexecutortransaction)，重复方法不再赘述
+
+| 名称                 | 类型              | 参数类型                                                                                          | 返回值            | OpenHarmony 平台支持 | 描述 |
+|--------------------|-----------------|-----------------------------------------------------------------------------------------------|----------------| --- | --- |
+| path               | 属性              | -                                                                                             | String         | yes | 数据库路径 |
+| isOpen             | 属性              | -                                                                                             | bool           | yes | 数据库是否打开；在调用 `close()` 后返回 false |
+| close              | 方法              | -                                                                                             | Future\<void\> | yes | 关闭数据库 |
+| transaction        | 方法              | Future\<T\> Function([Transaction](#databaseexecutortransaction) txn) action, bool? exclusive | Future\<T\>    | yes | 事务执行入口 |
+| devInvokeMethod    | 方法 (Deprecated) | String method, [Object? arguments]                                                            | Future\<T\>    | yes | 开发/测试用方法；按源码为开发专用（已标记为 `@Deprecated('Dev only')`） |
+| devInvokeSqlMethod | 方法 (Deprecated) | String method, String sql, [List<Object?>? arguments]                                         | Future\<T\>    | yes | 开发/测试用方法；执行 SQL 的开发专用方法（已标记为 `@Deprecated('Dev only')`） |
+
+#### DatabaseExecutor/Transaction
+
+| 名称             | 类型 | 参数类型                                                  | 返回值                                 | OpenHarmony 平台支持 | 描述 |
+|----------------| --- |-------------------------------------------------------|-------------------------------------| --- | --- |
+| batch          | 方法 | -                                                     | Batch                               | yes | 获取批处理操作对象 |
+| delete         | 方法 | String table, String? where, List<Object?>? whereArgs | Future\<int\>                       | yes | 删除符合条件的数据行 |
+| execute        | 方法 | String sql, List<Object?>? arguments                  | Future\<void\>                      | yes | 执行 SQL 语句 |
+| getVersion     | 方法 | /                                                     | Future\<int\>                       | yes | 获取数据库内部版本 |
+| insert         | 方法 | [InsertOption](#insertoption)                         | Future\<int\>                       | yes | 插入 SQL 并返回最后插入的行ID |
+| query          | 方法 | [QueryOption](#queryoption)                           | Future<List<Map<String, Object?>>>  | yes | 查询返回结果集列表 |
+| queryCursor    | 方法 | [QueryCursor](#querycursoroption)                     | Future<[QueryCursor](#querycursor)> | yes | 查询返回游标对象 |
+| rawDelete      | 方法 | String sql, List<Object?>? arguments                  | Future\<int\>                       | yes | 直接执行 SQL 删除符合条件的数据行 |
+| rawInsert      | 方法 | String sql, List<Object?>? arguments                  | Future\<int\>                       | yes | 执行原始 SQL INSERT 查询并返回最后插入的行ID |
+| rawQuery       | 方法 | String sql, List<Object?>? arguments                  | Future<List<Map<String, Object?>>>  | yes | 直接执行 SQL 查询返回结果集列表 |
+| rawQueryCursor | 方法 | String sql, List<Object?>? arguments, int? bufferSize | Future<[QueryCursor](#querycursor)> | yes | 执行原始 SQL 查询返回游标对象 |
+| rawUpdate      | 方法 | String sql, List<Object?>? arguments                  | Future\<int\>                       | yes | 直接执行更新 SQL 返回影响行数 |
+| setVersion     | 方法 | int version                                           | Future\<void\>                      | yes | 设置数据库内部版本，用于内部打开助手和自动版本控制 |
+| update         | 方法 | [UpdateOption](#updateoption)                         | Future\<int\>                       | yes | 执行更新 SQL 返回影响行数 |
+
 
 #### DatabaseFactory
 
-| Name                                                      | **return value** | Description                          | Type     | **ohos Support** |
-| --------------------------------------------------------- | ---------------- | ------------------------------------ | -------- | ---------------- |
-| openDatabase(String path, {OpenDatabaseOptions? options}) | Future<Database> | 打开指定路径的数据库，可配置打开选项 | function | yes              |
-| getDatabasesPath                                          | Future<String>   | 获取数据库默认存储路径               | function | yes              |
-| setDatabasesPath(String path)                             | Future<void>     | 设置默认数据库存储路径               | function | yes              |
-| deleteDatabase(String path)                               | Future<void>     | 删除指定路径的数据库                 | function | yes              |
-| databaseExists(String path)                               | Future<bool>     | 检查指定路径的数据库是否存在         | function | yes              |
+| 名称               | 类型 | 参数类型                                                              | 返回值                  | OpenHarmony 平台支持 | 描述 |
+|------------------| --- |-------------------------------------------------------------------|----------------------| --- | --- |
+| openDatabase     | 方法 | String path, [OpenDatabaseOptions](#opendatabaseoptions)? options | Future\<Database\>   | yes | 打开指定路径的数据库，可配置打开选项 |
+| getDatabasesPath | 方法 | -                                                                 | Future\<String\>     | yes | 获取数据库默认存储路径 |
+| setDatabasesPath | 方法 | String path                                                       | Future\<void\>       | yes | 设置默认数据库存储路径 |
+| deleteDatabase   | 方法 | String path                                                       | Future\<void\>       | yes | 删除指定路径的数据库 |
+| databaseExists   | 方法 | String path                                                       | Future\<bool\>       | yes | 检查指定路径的数据库是否存在 |
 
-#### DatabaseExecutor
+#### QueryCursor
 
-| Name                                                         | **return value**                   | Description                     | Type     | **ohos Support** |
-| ------------------------------------------------------------ | ---------------------------------- | ------------------------------- | -------- | ---------------- |
-| execute(String sql, [List<Object?>? arguments])              | Future<void>                       | 执行 SQL 语句                   | function | yes              |
-| rawInsert(String sql, [List<Object?>? arguments])            | Future<int>                        | 直接执行插入 SQL 返回行数       | function | yes              |
-| insert(String table, Map<String, Object?> values, {String?  nullColumnHack,ConflictAlgorithm? conflictAlgorithm}) | Future<int>                        | 插入 SQL 返回行数               | function | yes              |
-| query(String table,<br/>      {bool? distinct,<br/>      List<String>? columns,<br/>      String? where,<br/>      List<Object?>? whereArgs,<br/>      String? groupBy,<br/>      String? having,<br/>      String? orderBy,<br/>      int? limit,<br/>      int? offset}); | Future<List<Map<String, Object?>>> | 查询返回结果集列表              | function | yes              |
-| rawQuery(String sql,      [List<Object?>? arguments])        | Future<List<Map<String, Object?>>> | 直接执行 SQL 查询返回结果集列表 | function | yes              |
-| rawQueryCursor(String sql, List<Object?>? arguments, {int? bufferSize}) | Future<QueryCursor>                | 执行原始 SQL 查询返回游标对象   | function | yes              |
-| queryCursor(String table,<br/>      {bool? distinct,<br/>      List<String>? columns,<br/>      String? where,<br/>      List<Object?>? whereArgs,<br/>      String? groupBy,<br/>      String? having,<br/>      String? orderBy,<br/>      int? limit,<br/>      int? offset,<br/>      int? bufferSize}) | Future<QueryCursor>                | 查询返回游标对象                | function | yes              |
-| rawUpdate(String sql, [List<Object?>? arguments])            | Future<int>                        | 直接执行更新 SQL 返回影响行数   | function | yes              |
-| update(String table, Map<String, Object?> values,<br/>      {String? where,<br/>      List<Object?>? whereArgs,<br/>      ConflictAlgorithm? conflictAlgorithm}) | Future<int>                        | 执行更新 SQL 返回影响行数       | function | yes              |
-| rawDelete(String sql, [List<Object?>? arguments])            | Future<int>                        | 直接执行SQL删除符合条件的数据行 | function | yes              |
-| delete(String table, {String? where, List<Object?>? whereArgs}) | Future<int>                        | 删除符合条件的数据行            | function | yes              |
-| batch                                                        | Batch                              | 获取批处理操作对象              | function | yes              |
-| get database                                                 | Database                           | 获取底层数据库实例              | function | yes              |
+| 名称        | 类型   | 参数类型 | 返回值                  | OpenHarmony 平台支持 | 描述 |
+|-----------|------|---|----------------------| --- | --- |
+| current   | 属性   | - | Map<String, Object?> | yes | 当前行数据 |
+| close     | 方法   | - | Future\<void\>       | yes | 手动关闭游标 |
+| moveNext  | 方法   | - | Future\<bool\>       | yes | 移动到下一行，返回 false 时游标自动关闭 |
 
-#### **Batch**
+### 属性
+#### OpenDatabaseOptions
 
-| Name                                                         | **return value**      | Description            | Type     | **ohos Support** |
-| ------------------------------------------------------------ | --------------------- | ---------------------- | -------- | ---------------- |
-| commit({<br/>    bool? exclusive,<br/>    bool? noResult,<br/>    bool? continueOnError,<br/>  }) | Future<List<Object?>> | 提交批量操作           | function | yes              |
-| apply({bool? noResult, bool? continueOnError})               | Future<List<Object?>> | 执行批量操作并自动提交 | function | yes              |
-| rawInsert(String sql, [List<Object?>? arguments])            | void                  | 执行SQL插入语句        | function | yes              |
-| insert(String table, Map<String, Object?> values,<br/>      {String? nullColumnHack, ConflictAlgorithm? conflictAlgorithm}) | void                  | 执行SQL插入语句        | function | yes              |
-| rawUpdate(String sql, [List<Object?>? arguments])            | void                  | 执行SQL更新语句        | function | yes              |
-| update(String table, Map<String, Object?> values,<br/>      {String? where,<br/>      List<Object?>? whereArgs,<br/>      ConflictAlgorithm? conflictAlgorithm}) | void                  | 执行SQL更新语句        | function | yes              |
-| rawDelete(String sql, [List<Object?>? arguments])            | void                  | 执行SQL删除语句        | function | yes              |
-| delete(String table, {String? where, List<Object?>? whereArgs}) | void                  | 执行SQL删除语句        | function | yes              |
-| execute(String sql, [List<Object?>? arguments])              | void                  | 执行通用SQL语句        | function | yes              |
-| query(String table,<br/>      {bool? distinct,<br/>      List<String>? columns,<br/>      String? where,<br/>      List<Object?>? whereArgs,<br/>      String? groupBy,<br/>      String? having,<br/>      String? orderBy,<br/>      int? limit,<br/>      int? offset}) | void                  | 执行 SQL 查询语句      | function | yes              |
-| rawQuery(String sql, [List<Object?>? arguments])             | void                  | 执行 SQL 查询语句      | function | yes              |
-| get length                                                   | int                   | 获取累计操作数量       | function | yes              |
+| 名称             | 参数类型                                | 必填  | OpenHarmony平台支持 | 描述 |
+|----------------|-------------------------------------|-----| --- | --- |
+| version        | int?                                   | 否   | yes | 数据库版本，必须为大于 0 的 32 位整数 |
+| onConfigure    | [OnDatabaseConfigureFn](#回调类型)?     | 否   | yes | 数据库配置回调，参数：`Database db` |
+| onCreate       | [OnDatabaseCreateFn](#回调类型)?        | 否   | yes | 数据库首次创建回调，参数：`Database db, int version` |
+| onUpgrade      | [OnDatabaseVersionChangeFn](#回调类型)? | 否   | yes | 数据库版本升级回调，参数：`Database db, int oldVersion, int newVersion` |
+| onDowngrade    | [OnDatabaseVersionChangeFn](#回调类型)? | 否   | yes | 数据库版本降级回调，参数：`Database db, int oldVersion, int newVersion` |
+| onOpen         | [OnDatabaseOpenFn](#回调类型)?          | 否   | yes | 数据库打开完成回调，参数：`Database db` |
+| readOnly       | bool?                                 | 否   | yes | 是否以只读模式打开数据库；默认 `false` |
+| singleInstance | bool?                                 | 否   | yes | 是否启用单例数据库实例；默认 `true` |
 
-## 5. 遗留问题
+#### InsertOption
 
-- [ ]  ohos 当前查询返回数据量特别大时，受 taskPool 限制，导致 序列化失败，无法正常返回数据。 : [issue#75](https://gitcode.com/openharmony-sig/flutter_sqflite/issues/75)。
+| 名称                | 参数类型                      | 必填  | OpenHarmony平台支持 | 描述 |
+|-------------------|---------------------------|-----| --- | --- |
+| table             | String                    | 是   | yes | 要插入的表名 |
+| values            | Map<String, Object?>      | 是   | yes | 要插入的列和值映射 |
+| nullColumnHack    | String?                   | 否   | yes | 可选，用于在 values 为空时指定列名以插入 NULL |
+| conflictAlgorithm | [ConflictAlgorithm](#conflictalgorithm)? | 否   | yes | 冲突解决策略（原名 ConflictAlgorithm） |
 
-## 6. 其他
-- DateTime 不是 SQLite 支持的类型。可以把它们存为 int（自纪元以来的毫秒数）或 string（ISO8601 格式）。
+#### QueryOption
 
-- bool 不是 SQLite 支持的类型。可以使用 INTEGER 并用 0 和 1 表示。
+| 名称        | 参数类型           | 必填 | OpenHarmony平台支持 | 描述 |
+|-----------|----------------| --- | --- | --- |
+| table     | String         | 是 | yes | 要查询的表名 |
+| distinct  | bool?          | 否 | yes | 是否去重 |
+| columns   | List<String>?  | 否 | yes | 返回的列名列表，缺省为所有列 |
+| where     | String?        | 否 | yes | WHERE 子句（不含 WHERE 关键字） |
+| whereArgs | List<Object?>? | 否 | yes | WHERE 子句中占位符对应的参数列表 |
+| groupBy   | String?        | 否 | yes | GROUP BY 子句（不含关键字） |
+| having    | String?        | 否 | yes | HAVING 子句（不含关键字） |
+| orderBy   | String?        | 否 | yes | ORDER BY 子句（不含关键字） |
+| limit     | int?           | 否 | yes | 最大返回行数 |
+| offset    | int?           | 否 | yes | 返回偏移量 |
 
-- 在 sqflite 中，double 类型和 REAL 类型指的是同一个东西，使用 DOUBLE 或 REAL 来声明列，在数据库的存储方式是相同的。
+#### QueryCursorOption
 
-## 7. 开源协议
+| 名称         | 参数类型           | 必填 | OpenHarmony平台支持 | 描述 |
+|------------|----------------| --- | --- | --- |
+| table      | String         | 是 | yes | 要查询的表名 |
+| distinct   | bool?          | 否 | yes | 是否去重 |
+| columns    | List<String>?  | 否 | yes | 返回的列名列表 |
+| where      | String?        | 否 | yes | WHERE 子句（不含关键字） |
+| whereArgs  | List<Object?>? | 否 | yes | WHERE 子句中占位符对应的参数列表 |
+| groupBy    | String?        | 否 | yes | GROUP BY 子句 |
+| having     | String?        | 否 | yes | HAVING 子句 |
+| orderBy    | String?        | 否 | yes | ORDER BY 子句 |
+| limit      | int?           | 否 | yes | 最大返回行数 |
+| offset     | int?           | 否 | yes | 返回偏移量 |
+| bufferSize | int?           | 否 | yes | 游标缓冲区大小，影响底层批量读取行为 |
+    
+#### UpdateOption
 
-本项目基于 [BSD 2-Clause License](https://gitcode.com/openharmony-sig/flutter_sqflite/blob/master/LICENSE)，请自由地享受和参与开源。
+| 名称                | 参数类型                      | 必填 | OpenHarmony平台支持 | 描述 |
+|-------------------|---------------------------| --- | --- | --- |
+| table             | String                    | 是 | yes | 要更新的表名 |
+| values            | Map<String, Object?>      | 是 | yes | 列和值映射 |
+| where             | String?                   | 否 | yes | WHERE 子句（不含关键字） |
+| whereArgs         | List<Object?>?            | 否 | yes | WHERE 子句中占位符对应的参数列表 |
+| conflictAlgorithm | [ConflictAlgorithm](#conflictalgorithm)? | 否 | yes | 冲突解决策略 |
+
+#### ConflictAlgorithm
+
+| 名称         | 参数类型 | OpenHarmony平台支持 | 描述 |
+|------------| --- | --- | --- |
+| rollback   | 枚举值 | yes | 冲突时回滚事务并终止 |
+| abort      | 枚举值 | yes | 冲突时终止当前语句 |
+| fail       | 枚举值 | yes | 冲突时终止语句但保留之前变更 |
+| ignore     | 枚举值 | yes | 冲突时忽略当前行并继续 |
+| replace    | 枚举值 | yes | 冲突时替换已有行 |
+
+#### 回调类型
+
+| 回调                        | 参数类型                                                                                 | OpenHarmony平台支持 | 描述 |
+|---------------------------|--------------------------------------------------------------------------------------| --- | --- |
+| OnDatabaseConfigureFn     | FutureOr\<void\> Function([Database](#database) db)                                  | yes | 参数：`Database db`；返回：`FutureOr<void>`；数据库打开后、其他回调之前触发 |
+| OnDatabaseCreateFn        | FutureOr\<void\> Function([Database](#database) db, int version)                     | yes | 参数：`Database db, int version`；返回：`FutureOr<void>`；数据库首次创建时触发 |
+| OnDatabaseVersionChangeFn | FutureOr\<void\> Function([Database](#database) db, int oldVersion, int newVersion); | yes | 参数：`Database db, int oldVersion, int newVersion`；返回：`FutureOr<void>`；数据库升级或降级时触发 |
+| OnDatabaseOpenFn          | FutureOr\<void\> Function([Database](#database) db)                                  | yes | 参数：`Database db`；返回：`FutureOr<void>`；数据库打开完成后触发 |
+
+## 常见问题
+
+### 是否支持 OpenHarmony
+
+支持。OpenHarmony 适配版本在本仓库维护，具体可用版本见“兼容性”章节。
+
+### sqflite_common 依赖地址如何配置
+
+OpenHarmony 适配版本依赖 GitCode 仓库地址。若项目已使用 pub.dev 的 sqflite，请切换为本文档的 git 依赖方式。
+
+## 遗留问题
+
+- [ ] OpenHarmony 查询返回数据量特别大时，受 taskPool 限制，可能导致序列化失败，无法正常返回数据。参见 [issue #75](https://gitcode.com/CPF-Flutter/flutter_sqflite/issues/75)。
+
+## 目录结构
+```
+sqflite
+├── packages/                   # 扩展包与工具示例（如控制台测试应用）
+├── packages_web/               # Web 相关实现与测试
+├── sqflite/                    # Flutter sqflite 插件主体
+│   └── android/ios             # Android/iOS 平台原生实现
+│   └── doc/                    # 插件使用文档与开发说明
+│   └── example/                # 示例工程
+│   └── lib/                    # Dart API 与核心实现
+│   └── ohos/                   # OpenHarmony 平台适配实现
+├── sqflite_common/             # 跨平台通用实现
+├── sqflite_common_ffi/         # FFI 相关实现与测试
+├── sqflite_common_test/        # 公共测试用例
+├── sqflite_support/            # 支撑库与辅助测试代码
+├── sqflite_test_app/           # 插件集成测试应用
+├── README_OpenHarmony_CN.md   # 中文文档
+├── README_OpenHarmony.md      # 英文文档
+```
+
+## 贡献代码
+
+使用过程中发现任何问题都可以提 [Issue](https://gitcode.com/CPF-Flutter/flutter_sqflite/issues) ，当然，也非常欢迎发 [PR](https://gitcode.com/CPF-Flutter/flutter_sqflite/pulls) 共建。
+
+## 开源协议
+
+本项目基于[BSD 2-Clause License](https://gitcode.com/CPF-Flutter/flutter_sqflite/blob/master/LICENSE) ，请自由地享受和参与开源。
