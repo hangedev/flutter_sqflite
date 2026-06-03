@@ -146,5 +146,58 @@ class TodoTestPage extends TestPage {
       await todoProvider.close();
       //await Sqflite.setDebugModeOn(false);
     });
+
+    test('deleteDatabase while open', () async {
+      final path = await initDeleteDb('simple_todo_delete_open.db');
+      final todoProvider = TodoProvider();
+      await todoProvider.open(path);
+
+      var todo = Todo()..title = 'before delete';
+      await todoProvider.insert(todo);
+      expect(todo.id, 1);
+      expect(await todoProvider.getTodo(1), isNotNull);
+
+      // Delete without closing first: native side should close then delete.
+      await deleteDatabase(path);
+
+      try {
+        await todoProvider.db.getVersion();
+        verify(false, 'database should be closed after deleteDatabase');
+      } on DatabaseException catch (e) {
+        verify(e.isDatabaseClosedError());
+      }
+
+      expect(await databaseExists(path), isFalse);
+
+      await todoProvider.open(path);
+      todo = Todo()..title = 'after delete';
+      await todoProvider.insert(todo);
+      expect(todo.id, 1);
+      expect((await todoProvider.getTodo(1))!.title, 'after delete');
+
+      await todoProvider.close();
+    });
+
+    test('deleteDatabase not opened', () async {
+      final path = await initDeleteDb('simple_todo_delete_not_opened.db');
+      expect(await databaseExists(path), isFalse);
+      // Never opened: should not throw.
+      await deleteDatabase(path);
+      expect(await databaseExists(path), isFalse);
+    });
+
+    test('deleteDatabase closed file', () async {
+      final path = await initDeleteDb('simple_todo_delete_closed.db');
+      final todoProvider = TodoProvider();
+      await todoProvider.open(path);
+      await todoProvider.insert(Todo()..title = 'closed before delete');
+      await todoProvider.close();
+      expect(await databaseExists(path), isTrue);
+      expect(await pathExists(path), isTrue);
+
+      await deleteDatabase(path);
+      expect(await databaseExists(path), isFalse);
+      expect(await pathExists(path), isFalse);
+    });
   }
 }
