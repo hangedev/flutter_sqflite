@@ -136,17 +136,7 @@ export class DatabaseHelper {
       try {
         // 对于损坏的数据库,先从内存移除,避免 close() 挂起
         DatabaseHelper.removeDatabaseFromMemoryByDatabaseName(dbName);
-        // 使用 Promise.race 添加超时保护
-        const closePromise = local.close();
-        const timeoutPromise = new Promise<void>((_, reject) => {
-          setTimeout(() => reject(new Error('Close timeout')), 5000); // 5秒超时
-        });
-        
-        try {
-          await Promise.race([closePromise, timeoutPromise]);
-        } catch (closeErr) {
-          Log.e('DatabaseHelper', `rdbStore.close() failed or timeout: ${JSON.stringify(closeErr)}`);
-        }
+        await DatabaseHelper.closeRdbStoreWithTimeout(local, 'on closeDatabase');
         
         // 如果是内存数据库，关闭后删除临时文件
         if (DatabaseHelper.memoryDbMap.has(dbId)) {
@@ -190,14 +180,23 @@ export class DatabaseHelper {
     let dbName: string = DatabaseHelper.getDatabaseNameByDbPathDirList(dbPathDirList);
 
     try {
+      // 与 Android 一致：先关闭已打开的数据库，再删除文件
+      let local: relationalStore.RdbStore | null = DatabaseHelper.getDatabaseFromMemory(dbName);
+      if (local != null) {
+        const dbId: number = DatabaseHelper.getMemoryDatabaseIdByDatabaseName(dbName);
+        DatabaseHelper.removeDatabaseFromMemoryByDatabaseName(dbName);
+        await DatabaseHelper.closeRdbStoreWithTimeout(local, 'before delete');
+        if (dbId >= 0 && DatabaseHelper.memoryDbMap.has(dbId)) {
+          DatabaseHelper.memoryDbMap.delete(dbId);
+        }
+      }
+
       let config: relationalStore.StoreConfig = DatabaseHelper.createDatabaseConfig(dbPathDirList, dbName);
       await relationalStore.deleteRdbStore(context, config);
       result = true;
-      if (DatabaseHelper.dbMap.has(dbName)) {
-        DatabaseHelper.removeDatabaseFromMemoryByDatabaseName(dbName);
-      }
       return result;
     } catch (e) {
+      Log.e('DatabaseHelper', `deleteRdbStore failed: ${JSON.stringify(e)}`);
       return result;
     }
   }
@@ -294,6 +293,28 @@ export class DatabaseHelper {
       }
     })
     return id;
+  }
+
+  private static async closeRdbStoreWithTimeout(local: relationalStore.RdbStore,
+    logContext: string): Promise<void> {
+    let timerId: number = -1;
+    try {
+      const closePromise = local.close();
+      const timeoutPromise = new Promise<void>((_, reject) => {
+        timerId = setTimeout(() => reject(new Error('Close timeout')), 5000);
+      });
+      try {
+        await Promise.race([closePromise, timeoutPromise]);
+      } catch (closeErr) {
+        Log.e('DatabaseHelper', `rdbStore.close() failed or timeout ${logContext}: ${JSON.stringify(closeErr)}`);
+      } finally {
+        if (timerId >= 0) {
+          clearTimeout(timerId);
+        }
+      }
+    } catch (err) {
+      Log.e('DatabaseHelper', `Error closing database ${logContext}: ${JSON.stringify(err)}`);
+    }
   }
 
   private static removeDatabaseFromMemoryByDatabaseName(dbName: string) {
