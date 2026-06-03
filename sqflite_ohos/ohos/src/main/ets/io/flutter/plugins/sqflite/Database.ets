@@ -336,9 +336,9 @@ export class Database {
       return true;
     }
     
-    // 如果 rowId <= 0 (比如 ON CONFLICT IGNORE),直接返回 0
+    // 如果 rowId <= 0 (比如 ON CONFLICT IGNORE),直接返回 null 与android 和IOS 保持一致
     if (rowIdResult <= 0) {
-      operation.success(0);
+      operation.success(null);
       return true;
     }
     
