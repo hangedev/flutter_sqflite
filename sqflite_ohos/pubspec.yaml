@@ -1,6 +1,6 @@
 name: sqflite_ohos
-repository: https://gitcode.com/openharmony-sig/flutter_sqflite/master/sqflite_ohos
-issue_tracker: https://gitcode.com/openharmony-sig/flutter_sqflite/issues
+repository: https://gitcode.com/CPF-Flutter/flutter_sqflite/master/sqflite_ohos
+issue_tracker: https://gitcode.com/CPF-Flutter/flutter_sqflite/issues
 description: Ohos flutter plugin for SQLite, a self-contained, high-reliability,
   embedded, SQL database engine.
 version: 2.4.1
