@@ -24,7 +24,7 @@ dependencies:
   sqlite3: '>=2.3.0 <4.0.0'
   sqflite_common:
     git:
-      url: "https://gitcode.com/openharmony-sig/flutter_sqflite.git"
+      url: "https://gitcode.com/CPF-Flutter/flutter_sqflite.git"
       path: "sqflite_common"
       ref: "br_v2.3.3+1_ohos"
   synchronized: '>=3.0.0 <5.0.0'
