@@ -18,7 +18,7 @@ Go to the project directory and add the following dependencies in pubspec.yamlï¼
 dependencies:
   sqflite:
     git:
-      url: "https://gitcode.com/openharmony-sig/flutter_sqflite.git"
+      url: "https://gitcode.com/CPF-Flutter/flutter_sqflite.git"
       path: ./sqflite
       ref: "br_v2.4.2_ohos"
 ```
@@ -161,10 +161,10 @@ Open  `entry/src/main/resources/base/element/string.json` and add the following 
 
 ## 5. Known Issues
 
-- [ ]  ohos  When query results contain excessively large datasets, serialization failures occur due to taskPool limitations, preventing normal data return. : [issue#75](https://gitcode.com/openharmony-sig/flutter_sqflite/issues/75).
+- [ ]  ohos  When query results contain excessively large datasets, serialization failures occur due to taskPool limitations, preventing normal data return. : [issue#75](https://gitcode.com/CPF-Flutter/flutter_sqflite/issues/75).
 
 ## 6. Others
 
 ## 7.**License**
 
-This project is licensed under [BSD 2-Clause License](https://gitcode.com/openharmony-sig/flutter_sqflite/blob/master/LICENSE)
+This project is licensed under [BSD 2-Clause License](https://gitcode.com/CPF-Flutter/flutter_sqflite/blob/master/LICENSE)
