@@ -18,7 +18,7 @@
 dependencies:
   sqflite:
     git:
-      url: "https://gitcode.com/openharmony-sig/flutter_sqflite.git"
+      url: "https://gitcode.com/CPF-Flutter/flutter_sqflite.git"
       path: ./sqflite
       ref: br_v2.3.3+1_ohos
 ```
@@ -160,7 +160,7 @@ flutter pub get
 
 ## 5. 遗留问题
  
-- [ ] ohos 当前查询返回数据量特别大时，受 taskPool 限制，导致 序列化失败，无法正常返回数据[issue#75](https://gitcode.com/openharmony-sig/flutter_sqflite/issues/75)
+- [ ] ohos 当前查询返回数据量特别大时，受 taskPool 限制，导致 序列化失败，无法正常返回数据[issue#75](https://gitcode.com/CPF-Flutter/flutter_sqflite/issues/75)
 
 
 ## 6. 其它
@@ -171,5 +171,5 @@ flutter pub get
 - 在 sqflite 中，double 类型和 REAL 类型指的是同一个东西，使用 DOUBLE 或 REAL 来声明列，在数据库的存储方式是相同的。
 ## 7. 开源协议
 
-本项目基于 [BSD 2-Clause License](https://gitcode.com/openharmony-sig/flutter_sqflite/blob/br_v2.3.3+1_ohos/LICENSE)，请自由地享受和参与开源。
+本项目基于 [BSD 2-Clause License](https://gitcode.com/CPF-Flutter/flutter_sqflite/blob/br_v2.3.3+1_ohos/LICENSE)，请自由地享受和参与开源。
 
