@@ -1,4 +1,4 @@
-/*
+﻿/*
 * Copyright (c) 2023 Hunan OpenValley Digital Industry Development Co., Ltd.
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -36,6 +36,13 @@ export class DatabaseHelper {
   private static memoryDbMap: Map<number, string> = new Map<number, string>();
   // 应用上下文: 用于数据库操作
   private static appContext: common.Context | null = null;
+  // 跟踪各数据库当前事务深度, 用于恢复 openDatabase 返回标志
+  private static transactionDepthByDbName: Map<string, number> = new Map<string, number>();
+  // 按dbName隔离的事务内创建的表记录
+  private static transactionCreatedTablesByDbName: Map<string, Set<string>> = new Map<string, Set<string>>();
+  // 占位数据库的错误映射: 记录因损坏而延迟失败的 dbId → 错误消息
+  // 用途: 对"已存在的损坏数据库"在 openDatabase 阶段先返回成功，后续操作再返回 sqlite_error
+  public static invalidOpenDbErrors: HashMap<number, string> = new HashMap<number, string>();
 
   // 打开一个数据库
   public static async openDatabase(context: common.Context, call: MethodCall, result: MethodResult): Promise<void> {
@@ -59,9 +66,13 @@ export class DatabaseHelper {
 
     const isExisted: boolean = await DatabaseHelper.checkDatabaseExisted(dbPath);
     let local: relationalStore.RdbStore | null = DatabaseHelper.getDatabaseFromMemory(dbName);
+    let recovered: boolean = false;
+    let recoveredInTransaction: boolean = false;
     if (isExisted && local != null) {
       // 从通过数据库名称从内存中获取数据库ID
       id = DatabaseHelper.getMemoryDatabaseIdByDatabaseName(dbName);
+      recovered = true;
+      recoveredInTransaction = DatabaseHelper.isDatabaseInTransaction(dbName);
     } else {
       let readOnly: boolean =
         call.argument(Constant.PARAM_READ_ONLY) == undefined ? false : call.argument(Constant.PARAM_READ_ONLY);
@@ -78,17 +89,33 @@ export class DatabaseHelper {
           DatabaseHelper.memoryDbMap.set(id, dbName);
         }
       } catch (err) {
-        // 创建数据库条目ID
-        DatabaseHelper.currentDbId = DatabaseHelper.currentDbId + 1;
-        id = DatabaseHelper.currentDbId;
-        DatabaseHelper.dbIdMap.set(id, dbName);
-        Log.i('DatabaseHelper', `Created dummy database entry: id=${id}, name=${dbName}`);
+        const error = err as BusinessError;
+        const message = error.message ?? JSON.stringify(err);
+        Log.e('DatabaseHelper', `open database failed: ${message}`);
+        // 对"已存在的损坏数据库文件"做延迟失败处理：openDatabase 先返回成功，
+        // 让后续 query/getVersion 返回 sqlite_error 而非 open_failed，
+        // 与 Android/iOS 在坏 sqlite 文件上的外部行为保持一致。
+        if (isExisted && Number(error.code) === Constant.RDB_ERROR_CODE_14800011) {
+          DatabaseHelper.currentDbId = DatabaseHelper.currentDbId + 1;
+          id = DatabaseHelper.currentDbId;
+          DatabaseHelper.dbIdMap.set(id, dbName);
+          DatabaseHelper.invalidOpenDbErrors.set(id, 'file is not a database');
+
+          Log.i('DatabaseHelper', `Deferred corrupt open: id=${id}, name=${dbName}`);
+        } else {
+          result.error(Constant.SQLITE_ERROR, `${Constant.ERROR_OPEN_FAILED} ${message}`, null);
+          return;
+        }
       }
     }
     let map: Record<string, Object> = {
       'id': id,
-      'recovered': false,
-      'recoveredInTransaction': false,
+    }
+    if (recovered) {
+      map['recovered'] = true;
+    }
+    if (recoveredInTransaction) {
+      map['recoveredInTransaction'] = true;
     }
     result.success(map);
   }
@@ -115,6 +142,18 @@ export class DatabaseHelper {
       result.error('sqlite_error', "database_closed" + dbId, null);
       return null;
     }
+    // 占位数据库: 对损坏文件的延迟失败处理
+    // openDatabase 阶段先返回成功，后续操作返回 sqlite_error + file is not a database
+    // closeDatabase 仍允许正常关闭，返回哑元对象以通过 SqflitePlugin 的前置非空校验
+    const invalidOpenError = DatabaseHelper.invalidOpenDbErrors.get(dbId);
+    if (invalidOpenError != undefined) {
+
+      if (call.method === Constant.METHOD_CLOSE_DATABASE) {
+        return {} as relationalStore.RdbStore;
+      }
+      result.error(Constant.SQLITE_ERROR, invalidOpenError, null);
+      return null;
+    }
     let rdbStore = DatabaseHelper.getDatabaseFromMemory(dbName);
     if (rdbStore != null) {
       return rdbStore;
@@ -123,12 +162,112 @@ export class DatabaseHelper {
       return null;
     }
   }
+  // 根据数据库 id 维护事务深度。
+  // 当 execute 成功进入事务时深度 +1，提交或回滚成功时深度 -1。
+  // 这里按 dbName 记录而不是用全局状态，避免多个数据库之间互相污染。
+  public static noteTransactionChangeByDbId(dbId: number, inTransactionChange: boolean): void {
+    const dbName: string | undefined = DatabaseHelper.dbIdMap.get(dbId);
+    if (dbName === undefined) {
+      return;
+    }
+    const currentDepth: number = DatabaseHelper.transactionDepthByDbName.get(dbName) ?? 0;
+    const nextDepth = inTransactionChange
+      ? currentDepth + 1
+      : Math.max(0, currentDepth - 1);
+    if (nextDepth > 0) {
+      DatabaseHelper.transactionDepthByDbName.set(dbName, nextDepth);
+    } else {
+      DatabaseHelper.transactionDepthByDbName.delete(dbName);
+    }
+  }
+
+  // 获取指定数据库的事务深度
+  public static getTransactionDepthByDbId(dbId: number): number {
+    const dbName: string | undefined = DatabaseHelper.dbIdMap.get(dbId);
+    if (dbName === undefined) {
+      return -1;
+    }
+    return DatabaseHelper.transactionDepthByDbName.get(dbName) ?? 0;
+  }
+
+  /**
+   * 添加事务内创建的表（按dbName隔离）
+   * 用于解决多数据库场景下的事务状态隔离问题
+   * @param dbName 数据库名称
+   * @param tableName 表名（会自动转为小写）
+   */
+  public static addTransactionCreatedTable(dbName: string, tableName: string): void {
+    if (!DatabaseHelper.transactionCreatedTablesByDbName.has(dbName)) {
+      DatabaseHelper.transactionCreatedTablesByDbName.set(dbName, new Set<string>());
+    }
+    DatabaseHelper.transactionCreatedTablesByDbName.get(dbName)!.add(tableName.toLowerCase());
+  }
+
+  /**
+   * 检查表是否在当前事务内创建（按dbName隔离）
+   * 用于处理OHOS RDB的事务隔离问题：在事务内创建表后立即查询该表
+   * @param dbName 数据库名称
+   * @param tableName 表名（会自动转为小写）
+   * @returns true-表在当前事务内创建，false-表不是在当前事务内创建
+   */
+  public static hasTransactionCreatedTable(dbName: string, tableName: string): boolean {
+    const tables = DatabaseHelper.transactionCreatedTablesByDbName.get(dbName);
+    return tables ? tables.has(tableName.toLowerCase()) : false;
+  }
+
+  /**
+   * 清理指定数据库的事务创建表记录（按dbName隔离）
+   * 在事务提交或回滚时调用，以及关闭数据库时调用
+   * @param dbName 数据库名称
+   */
+  public static clearTransactionCreatedTablesByDbName(dbName: string): void {
+    DatabaseHelper.transactionCreatedTablesByDbName.delete(dbName);
+  }
+
+  /**
+   * 清理指定数据库的所有事务状态（按dbName隔离）
+   * 统一清理事务深度和事务创建表记录，避免残留
+   * @param dbName 数据库名称
+   */
+  public static clearAllTransactionStateByDbName(dbName: string): void {
+    if (dbName !== undefined) {
+      DatabaseHelper.transactionDepthByDbName.delete(dbName);
+      DatabaseHelper.transactionCreatedTablesByDbName.delete(dbName);
+    }
+  }
+
+  // 判断指定数据库当前是否仍处于事务中。
+  // openDatabase 恢复已有单实例数据库时，会据此返回 recoveredInTransaction。
+  public static isDatabaseInTransaction(dbName: string): boolean {
+    return (DatabaseHelper.transactionDepthByDbName.get(dbName) ?? 0) > 0;
+  }
+
+  /**
+   * 清理指定数据库缓存的所有事务状态（按dbId查找dbName后清理）
+   * 统一清理事务深度和事务创建表记录，避免残留
+   * 预留给 close/delete 等场景使用，避免已关闭数据库残留事务信息
+   * @param dbId 数据库ID
+   */
+  public static clearTransactionStateByDbId(dbId: number): void {
+    const dbName: string | undefined = DatabaseHelper.dbIdMap.get(dbId);
+    if (dbName !== undefined) {
+      DatabaseHelper.clearAllTransactionStateByDbName(dbName);
+    }
+  }
 
   // 关闭一个数据库
   public static async closeDatabase(call: MethodCall, result: MethodResult): Promise<void> {
     let dbId: number = call.argument(Constant.PARAM_ID);
     let dbName: string | undefined = DatabaseHelper.dbIdMap.get(dbId);
     if (dbName == undefined) {
+      result.success(null);
+      return;
+    }
+    // 占位数据库: 清理占位条目并返回成功
+    if (DatabaseHelper.invalidOpenDbErrors.hasKey(dbId)) {
+      DatabaseHelper.invalidOpenDbErrors.remove(dbId);
+      DatabaseHelper.dbIdMap.remove(dbId);
+      result.success(null);
       return;
     }
     let local: relationalStore.RdbStore | null = DatabaseHelper.getDatabaseFromMemory(dbName);
@@ -137,12 +276,12 @@ export class DatabaseHelper {
         // 对于损坏的数据库,先从内存移除,避免 close() 挂起
         DatabaseHelper.removeDatabaseFromMemoryByDatabaseName(dbName);
         await DatabaseHelper.closeRdbStoreWithTimeout(local, 'on closeDatabase');
-        
+
         // 如果是内存数据库，关闭后删除临时文件
         if (DatabaseHelper.memoryDbMap.has(dbId)) {
           const tempDbName = DatabaseHelper.memoryDbMap.get(dbId)!;
           DatabaseHelper.memoryDbMap.delete(dbId);
-          
+
           // 删除临时数据库文件
           try {
             if (DatabaseHelper.appContext) {
@@ -156,7 +295,7 @@ export class DatabaseHelper {
             Log.e('DatabaseHelper', `Failed to delete temp db file: ${JSON.stringify(deleteErr)}`);
           }
         }
-        
+
         result.success(null);
         return;
       } catch (err) {
@@ -166,6 +305,8 @@ export class DatabaseHelper {
         return;
       }
     } else {
+      // 数据库实例已不在内存中时，顺手清理可能残留的事务状态与映射关系
+      DatabaseHelper.clearTransactionStateByDbId(dbId);
       // 清理ID
       DatabaseHelper.dbIdMap.remove(dbId);
       result.success(null);
@@ -189,6 +330,22 @@ export class DatabaseHelper {
         if (dbId >= 0 && DatabaseHelper.memoryDbMap.has(dbId)) {
           DatabaseHelper.memoryDbMap.delete(dbId);
         }
+      } else {
+        // 清理占位数据库的残留条目（仅在 dbIdMap 中有记录的情况）
+        // 查找 dbName 对应的所有 dbId
+        const dbIdsToRemove: number[] = [];
+        DatabaseHelper.dbIdMap.forEach((name: string, id: number) => {
+          if (name === dbName) {
+            dbIdsToRemove.push(id);
+          }
+        });
+        // 清理 dbIdMap 和 invalidOpenDbErrors
+        dbIdsToRemove.forEach((id: number) => {
+          DatabaseHelper.dbIdMap.remove(id);
+          DatabaseHelper.invalidOpenDbErrors.remove(id);
+        });
+        // 统一清理所有事务状态
+        DatabaseHelper.clearAllTransactionStateByDbName(dbName);
       }
 
       let config: relationalStore.StoreConfig = DatabaseHelper.createDatabaseConfig(dbPathDirList, dbName);
@@ -222,7 +379,7 @@ export class DatabaseHelper {
   public static async onDebug(call: MethodCall, result: MethodResult): Promise<void> {
     let cmd: string = call.argument(Constant.PARAM_CMD);
     let map: Record<string, Object> = {};
-    
+
     // Get database info
     if (Constant.CMD_GET === cmd) {
       // 返回数据库列表信息
@@ -234,6 +391,8 @@ export class DatabaseHelper {
           // 由于ohos端架构限制,暂时只能提供数据库名称
           info[Constant.PARAM_PATH] = dbName;
           info[Constant.PARAM_SINGLE_INSTANCE] = true; // 默认值
+          // 添加事务深度信息
+          info['transactionDepth'] = DatabaseHelper.getTransactionDepthByDbId(dbId);
           databasesInfo[dbId.toString()] = info;
         });
         map["databases"] = databasesInfo;
@@ -317,9 +476,25 @@ export class DatabaseHelper {
     }
   }
 
+  /**
+   * 从内存中移除数据库实例及相关状态（统一清理入口）
+   * 清理 dbMap、事务状态、dbIdMap、invalidOpenDbErrors 的所有相关条目
+   * @param dbName 数据库名称
+   */
   private static removeDatabaseFromMemoryByDatabaseName(dbName: string) {
     DatabaseHelper.dbMap.delete(dbName);
-    let id: number = DatabaseHelper.getMemoryDatabaseIdByDatabaseName(dbName);
-    DatabaseHelper.dbIdMap.remove(id);
+    DatabaseHelper.clearAllTransactionStateByDbName(dbName);
+
+    // 遍历清理所有匹配 dbName 的 dbId 和 invalidOpenDbErrors
+    const dbIdsToRemove: number[] = [];
+    DatabaseHelper.dbIdMap.forEach((name: string, id: number) => {
+      if (name === dbName) {
+        dbIdsToRemove.push(id);
+      }
+    });
+    dbIdsToRemove.forEach((id: number) => {
+      DatabaseHelper.dbIdMap.remove(id);
+      DatabaseHelper.invalidOpenDbErrors.remove(id);
+    });
   }
 }

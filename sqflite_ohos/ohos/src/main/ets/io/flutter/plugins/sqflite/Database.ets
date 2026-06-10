@@ -36,6 +36,7 @@ import {
   RollbackHandler
 } from './SqlHandler';
 import { deviceInfo } from '@kit.BasicServicesKit';
+import { DatabaseHelper } from './DatabaseHelper';
 
 
 type HandleCallback = (x: Object) => void;
@@ -46,11 +47,10 @@ export class Database {
   public id: number;
   public singleInstance: boolean;
   public logLevel: number;
+  // 事务ID计数器（全局唯一）
   private static lastTransactionId: number = 0;
+  // 当前事务ID（临时存储，用于返回给调用方）
   private static currentTransactionId: number | null;
-  private static transactionDepth: number = 0;
-  // 跟踪当前事务内创建的表
-  private static transactionCreatedTables: Set<string> = new Set();
   // 游标管理用于分页查询
   private static cursorMap: Map<number, relationalStore.ResultSet> = new Map();
   private static lastCursorId: number = 0;
@@ -72,24 +72,6 @@ export class Database {
     new DetachHandler()
   ];
 
-  private static enterOrLeaveInTransaction(value: boolean | null): void {
-    if (value == true) {
-      Database.transactionDepth++;
-    } else if (value == false) {
-      Database.transactionDepth--;
-    }
-  }
-
-  // 重置事务深度 (关闭数据库时调用)
-  public static resetTransactionDepth(): void {
-    Database.transactionDepth = 0;
-  }
-  
-  // 清空事务内创建的表记录 (提交或回滚时调用)
-  public static clearTransactionCreatedTables(): void {
-    Database.transactionCreatedTables.clear();
-  }
-
   private static async handleException(operation: Operation, err: BusinessError<void>, db?: relationalStore.RdbStore): Promise<void> {
     let code = err.code;
     let message = err.message;
@@ -100,6 +82,10 @@ export class Database {
       Database.handleTableOrSyntaxError(operation, message);
     } else if (code == Constant.RDB_ERROR_CODE_14800032) {
       await Database.handleConstraintViolation(operation, db);
+    } else if (code == Constant.RDB_ERROR_CODE_14800011) {
+      // 14800011 表示数据库文件损坏（如非 sqlite 文件），对应 SQLite 的 "file is not a database"
+      // 映射为 sqlite_error + "file is not a database"，与 Android/iOS 的查询阶段错误格式一致
+      operation.error(Constant.SQLITE_ERROR, 'file is not a database', SqlErrorInfo.getMap(operation));
     } else if (code == Constant.RDB_ERROR_CODE_801) {
       operation.error(Constant.SQLITE_ERROR, 'error code:' + code + '。' + " Database is readonly", SqlErrorInfo.getMap(operation));
     } else {
@@ -223,12 +209,17 @@ export class Database {
         // executeSql 不支持参数，DDL 语句通常也不需要参数
         await db.executeSql(sql);
         // 如果在事务内且是CREATE TABLE,记录表名以处理ohos事务隔离问题
-        const transactionId = operation.getTransactionId();
-        if (Database.transactionDepth > 0) {
-          const createMatch = sql.match(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)/i);
-          if (createMatch) {
-            const tableName = createMatch[1];
-            Database.transactionCreatedTables.add(tableName.toLowerCase());
+        // 使用按数据库隔离的事务深度，替代全局 transactionDepth
+        const dbId: number | undefined = operation.getArgument<number>(Constant.PARAM_ID);
+        if (dbId !== undefined) {
+          const dbName: string | undefined = DatabaseHelper.dbIdMap.get(dbId);
+          if (dbName !== undefined && DatabaseHelper.isDatabaseInTransaction(dbName)) {
+            const createMatch = sql.match(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)/i);
+            if (createMatch) {
+              const tableName = createMatch[1];
+              // 使用按dbName隔离的事务创建表记录
+              DatabaseHelper.addTransactionCreatedTable(dbName, tableName);
+            }
           }
         }
         promise = undefined; // DDL 语句没有返回值
@@ -272,12 +263,20 @@ export class Database {
     
     if (handler?.needsPostProcess ?? true) {
       if (success && inTransactionChange !== null) {
-        Database.enterOrLeaveInTransaction(inTransactionChange);        
-        // 如果是离开事务(COMMIT或ROLLBACK)，清空该事务创建表的记录
-        if (inTransactionChange === false) {
-          Database.clearTransactionCreatedTables();
+        const dbId: number | undefined = operation.getArgument<number>(Constant.PARAM_ID);
+        if (dbId !== undefined) {
+          DatabaseHelper.noteTransactionChangeByDbId(dbId, inTransactionChange);
+
+          // 如果是离开事务(COMMIT或ROLLBACK)，清空该数据库的事务创建表记录（按dbName隔离）
+          if (inTransactionChange === false) {
+            const dbName = DatabaseHelper.dbIdMap.get(dbId);
+            if (dbName !== undefined) {
+              DatabaseHelper.clearTransactionCreatedTablesByDbName(dbName);
+            }
+          }
         }
       }
+
       Database.handleExecute(success, enteringTransaction, operation, inTransactionChange);
     }
   }
@@ -476,16 +475,32 @@ export class Database {
    */
   private static handleEmptyResultSet(operation: Operation, sql: string): boolean {
     const tableMatch = sql.match(/FROM\s+(\w+)/i);
-    
+
     if (tableMatch) {
       const tableName = tableMatch[1];
       const tableNameLower = tableName.toLowerCase();
-      
+
       // 检查表是否在当前事务内创建
-      if (Database.transactionDepth <= 0 || !Database.transactionCreatedTables.has(tableNameLower)) {
+      // 使用按数据库隔离的事务深度，替代全局 transactionDepth
+      const dbId: number | undefined = operation.getArgument<number>(Constant.PARAM_ID);
+      let isInTransaction = false;
+      let dbName: string | undefined = undefined;
+      if (dbId !== undefined) {
+        dbName = DatabaseHelper.dbIdMap.get(dbId);
+        if (dbName !== undefined) {
+          isInTransaction = DatabaseHelper.isDatabaseInTransaction(dbName);
+        }
+      }
+
+      // 使用按dbName隔离的事务创建表记录检查
+      const tableCreatedInTransaction = dbName !== undefined
+        ? DatabaseHelper.hasTransactionCreatedTable(dbName, tableNameLower)
+        : false;
+
+      if (!isInTransaction || !tableCreatedInTransaction) {
         const reservedTableNames = ['table', 'index', 'group', 'order', 'select', 'where'];
         const isReservedTableName = reservedTableNames.includes(tableNameLower);
-        
+
         const errorMessage = isReservedTableName ? 'Generic error' : `Table does not exist: ${tableName}`;
         Database.handleException(operation, {
           code: Constant.RDB_ERROR_CODE_14800021,
@@ -501,7 +516,7 @@ export class Database {
       } as BusinessError<void>);
       return false;
     }
-    
+
     return true;
   }
 

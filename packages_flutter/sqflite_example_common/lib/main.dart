@@ -7,6 +7,9 @@ import 'package:sqflite_example_common/deprecated_test_page.dart';
 import 'package:sqflite_example_common/exception_test_page.dart';
 import 'package:sqflite_example_common/exp_test_page.dart';
 import 'package:sqflite_example_common/manual_test_page.dart';
+import 'package:sqflite_example_common/multi_db_transaction_test_page.dart';
+import 'package:sqflite_example_common/open_database_behavior_test_page.dart';
+import 'package:sqflite_example_common/open_error_verify_page.dart';
 import 'package:sqflite_example_common/src/dev_utils.dart';
 
 import 'io_test_page.dart';
@@ -72,6 +75,14 @@ const String testIoRoute = '/test/io';
 /// Deprecated test page.
 const String testDeprecatedRoute = '/test/deprecated';
 
+/// Multi-database transaction test page.
+const String testMultiDbTransactionRoute = '/test/multi_db_transaction';
+/// Open database behavior test page.
+const String testOpenDatabaseBehaviorRoute = '/test/open_database_behavior';
+
+/// Open error verify test page.
+const String testOpenErrorVerifyRoute = '/test/open_error_verify';
+
 /// Extra routes added by the application.
 Map<String, WidgetBuilder>? extraRoutes;
 
@@ -89,6 +100,12 @@ class _SqfliteExampleAppState extends State<SqfliteExampleApp> {
     testExpRoute: (BuildContext context) => ExpTestPage(),
     if (!kIsWeb) testIoRoute: (BuildContext context) => IoTestPage(),
     testDeprecatedRoute: (BuildContext context) => DeprecatedTestPage(),
+    testOpenDatabaseBehaviorRoute: (BuildContext context) =>
+        const SingleInstanceRecoveryPage(),
+    testMultiDbTransactionRoute: (BuildContext context) =>
+        const MultiDbTransactionTestPage(),
+    testOpenErrorVerifyRoute: (BuildContext context) =>
+        const OhosOpenErrorVerifyPage(),
   }..addAll(extraRoutes ?? {});
 
   @override
@@ -172,6 +189,27 @@ class MyHomePage extends StatefulWidget {
         'Deprecated test',
         'Keeping some old tests for deprecated functionalities',
         route: testDeprecatedRoute,
+      ),
+    );
+    _items.add(
+      MainItem(
+        'openDatabase 行为测试',
+        '单实例恢复',
+        route: testOpenDatabaseBehaviorRoute,
+      ),
+    );
+    _items.add(
+      MainItem(
+        '多数据库事务隔离测试',
+        '多数据库事务隔离',
+        route: testMultiDbTransactionRoute,
+      ),
+    );
+    _items.add(
+      MainItem(
+        '鸿蒙 openDatabase 错误测试',
+        '测试鸿蒙 RDB openDatabase错误场景',
+        route: testOpenErrorVerifyRoute,
       ),
     );
     if (extraRoutes != null) {
