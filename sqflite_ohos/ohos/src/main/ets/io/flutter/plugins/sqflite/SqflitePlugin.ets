@@ -203,8 +203,7 @@ export default class SqflitePlugin implements FlutterPlugin, MethodCallHandler {
     if (rdbStore == null) {
       return;
     }
-    // 关闭数据库前重置事务深度,避免多个数据库共享静态变量
-    Database.resetTransactionDepth();
+
     await DatabaseHelper.closeDatabase(call, result);
   }
 
