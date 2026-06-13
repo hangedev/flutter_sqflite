@@ -1,4 +1,4 @@
-﻿/*
+/*
 * Copyright (c) 2023 Hunan OpenValley Digital Industry Development Co., Ltd.
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -34,6 +34,14 @@ export class DatabaseHelper {
   private static currentDbId: number = 0;
   // 内存数据库映射表: 存储内存数据库ID到临时文件名的映射
   private static memoryDbMap: Map<number, string> = new Map<number, string>();
+  // 存储数据库ID到完整路径的映射（用于debug返回完整路径）
+  private static dbPathMap: HashMap<number, string> = new HashMap<number, string>();
+  // 存储数据库ID到singleInstance的映射（用于debug返回实际值）
+  private static dbSingleInstanceMap: HashMap<number, boolean> = new HashMap<number, boolean>();
+  // 存储数据库ID到logLevel的映射（用于debug返回实际值）
+  private static dbLogLevelMap: HashMap<number, number> = new HashMap<number, number>();
+  // 全局日志级别（用于debug返回全局logLevel，与 Android/iOS 对齐）
+  public static globalLogLevel: number = 0;
   // 应用上下文: 用于数据库操作
   private static appContext: common.Context | null = null;
   // 跟踪各数据库当前事务深度, 用于恢复 openDatabase 返回标志
@@ -49,9 +57,18 @@ export class DatabaseHelper {
     if (DatabaseHelper.appContext === null) {
       DatabaseHelper.appContext = context;
     }
-    
+
     let id: number = -1;
     let dbPath: string = call.argument(Constant.PARAM_PATH);
+    // 获取 singleInstance 和 logLevel 参数（用于 debug 返回实际值）
+    // 注意：call.argument() 返回 object 类型，需要显式类型检查
+    const singleInstanceValue: object = call.argument(Constant.PARAM_SINGLE_INSTANCE);
+    const singleInstance: boolean = (typeof singleInstanceValue === 'boolean') ? singleInstanceValue as boolean : true;
+    const logLevelValue: object = call.argument(Constant.PARAM_LOG_LEVEL);
+    // 如果参数中没有指定 logLevel，则继承全局 logLevel（与 Android/iOS 行为一致）
+    const logLevel: number = (typeof logLevelValue === 'number')
+      ? logLevelValue as number
+      : DatabaseHelper.globalLogLevel;
     let isMemoryDb: boolean = false;
     // 内存数据库转换为临时数据库 RdbStore 不支持SQLite :memory:语法
     if (dbPath === Constant.MEMORY_DATABASE_PATH) {
@@ -60,9 +77,12 @@ export class DatabaseHelper {
       const timestamp = Date.now();
       dbPath = `temp_memory_${timestamp}.db`;
     }
-    
+
     let dbPathDirList: string[] = dbPath.split('/');
     let dbName: string = DatabaseHelper.getDatabaseNameByDbPathDirList(dbPathDirList);
+    // 保存原始路径（用于 debug 返回完整路径）
+    const originalPathValue: object = call.argument(Constant.PARAM_PATH);
+    const originalPath: string = (typeof originalPathValue === 'string') ? originalPathValue as string : dbPath;
 
     const isExisted: boolean = await DatabaseHelper.checkDatabaseExisted(dbPath);
     let local: relationalStore.RdbStore | null = DatabaseHelper.getDatabaseFromMemory(dbName);
@@ -84,6 +104,10 @@ export class DatabaseHelper {
         DatabaseHelper.currentDbId = DatabaseHelper.currentDbId + 1;
         id = DatabaseHelper.currentDbId;
         DatabaseHelper.dbIdMap.set(id, dbName);
+        // 存储调试信息：完整路径、singleInstance、logLevel
+        DatabaseHelper.dbPathMap.set(id, originalPath);
+        DatabaseHelper.dbSingleInstanceMap.set(id, singleInstance);
+        DatabaseHelper.dbLogLevelMap.set(id, logLevel);
         // 记录内存数据库的映射关系，用于关闭时清理
         if (isMemoryDb) {
           DatabaseHelper.memoryDbMap.set(id, dbName);
@@ -100,6 +124,10 @@ export class DatabaseHelper {
           id = DatabaseHelper.currentDbId;
           DatabaseHelper.dbIdMap.set(id, dbName);
           DatabaseHelper.invalidOpenDbErrors.set(id, 'file is not a database');
+          // 存储调试信息：完整路径、singleInstance、logLevel（占位数据库也需要）
+          DatabaseHelper.dbPathMap.set(id, originalPath);
+          DatabaseHelper.dbSingleInstanceMap.set(id, singleInstance);
+          DatabaseHelper.dbLogLevelMap.set(id, logLevel);
 
           Log.i('DatabaseHelper', `Deferred corrupt open: id=${id}, name=${dbName}`);
         } else {
@@ -265,8 +293,7 @@ export class DatabaseHelper {
     }
     // 占位数据库: 清理占位条目并返回成功
     if (DatabaseHelper.invalidOpenDbErrors.hasKey(dbId)) {
-      DatabaseHelper.invalidOpenDbErrors.remove(dbId);
-      DatabaseHelper.dbIdMap.remove(dbId);
+      DatabaseHelper.removeDatabaseMappingsByDbId(dbId);
       result.success(null);
       return;
     }
@@ -307,8 +334,8 @@ export class DatabaseHelper {
     } else {
       // 数据库实例已不在内存中时，顺手清理可能残留的事务状态与映射关系
       DatabaseHelper.clearTransactionStateByDbId(dbId);
-      // 清理ID
-      DatabaseHelper.dbIdMap.remove(dbId);
+      // 清理ID和调试信息映射表
+      DatabaseHelper.removeDatabaseMappingsByDbId(dbId);
       result.success(null);
       return;
     }
@@ -339,10 +366,9 @@ export class DatabaseHelper {
             dbIdsToRemove.push(id);
           }
         });
-        // 清理 dbIdMap 和 invalidOpenDbErrors
+        // 清理 dbIdMap、invalidOpenDbErrors 和调试信息映射表
         dbIdsToRemove.forEach((id: number) => {
-          DatabaseHelper.dbIdMap.remove(id);
-          DatabaseHelper.invalidOpenDbErrors.remove(id);
+          DatabaseHelper.removeDatabaseMappingsByDbId(id);
         });
         // 统一清理所有事务状态
         DatabaseHelper.clearAllTransactionStateByDbName(dbName);
@@ -366,6 +392,9 @@ export class DatabaseHelper {
   // Options操作，设置LogLevel，仅限开发，已被废弃
   public static async options(call: MethodCall, result: MethodResult): Promise<void> {
     let logLevel: number | undefined = call.argument(Constant.PARAM_LOG_LEVEL);
+    if (logLevel !== undefined) {
+      DatabaseHelper.globalLogLevel = logLevel;
+    }
     result.success(null);
   }
 
@@ -382,15 +411,25 @@ export class DatabaseHelper {
 
     // Get database info
     if (Constant.CMD_GET === cmd) {
+      // 返回全局 logLevel（与 Android/iOS 一致）
+      if (DatabaseHelper.globalLogLevel > 0) {
+        map[Constant.PARAM_LOG_LEVEL] = DatabaseHelper.globalLogLevel;
+      }
+
       // 返回数据库列表信息
       if (DatabaseHelper.dbIdMap.length > 0) {
         let databasesInfo: Record<string, Object> = {};
         DatabaseHelper.dbIdMap.forEach((dbName: string, dbId: number) => {
           let info: Record<string, Object> = {};
-          // 从 dbMap 中获取数据库路径信息
-          // 由于ohos端架构限制,暂时只能提供数据库名称
-          info[Constant.PARAM_PATH] = dbName;
-          info[Constant.PARAM_SINGLE_INSTANCE] = true; // 默认值
+          // 返回完整路径
+          info[Constant.PARAM_PATH] = DatabaseHelper.dbPathMap.get(dbId) ?? dbName;
+          // 返回实际的 singleInstance 值
+          info[Constant.PARAM_SINGLE_INSTANCE] = DatabaseHelper.dbSingleInstanceMap.get(dbId) ?? true;
+          // 返回实际的 logLevel 值（大于 0 时才返回，与 Android 一致）
+          const logLevel = DatabaseHelper.dbLogLevelMap.get(dbId) ?? 0;
+          if (logLevel > 0) {
+            info[Constant.PARAM_LOG_LEVEL] = logLevel;
+          }
           // 添加事务深度信息
           info['transactionDepth'] = DatabaseHelper.getTransactionDepthByDbId(dbId);
           databasesInfo[dbId.toString()] = info;
@@ -477,15 +516,28 @@ export class DatabaseHelper {
   }
 
   /**
+   * 清理指定数据库ID的所有映射信息（统一清理方法）
+   * 包括：dbIdMap、invalidOpenDbErrors、dbPathMap、dbSingleInstanceMap、dbLogLevelMap
+   * @param dbId 数据库ID
+   */
+  private static removeDatabaseMappingsByDbId(dbId: number): void {
+    DatabaseHelper.dbIdMap.remove(dbId);
+    DatabaseHelper.invalidOpenDbErrors.remove(dbId);
+    DatabaseHelper.dbPathMap.remove(dbId);
+    DatabaseHelper.dbSingleInstanceMap.remove(dbId);
+    DatabaseHelper.dbLogLevelMap.remove(dbId);
+  }
+
+  /**
    * 从内存中移除数据库实例及相关状态（统一清理入口）
-   * 清理 dbMap、事务状态、dbIdMap、invalidOpenDbErrors 的所有相关条目
+   * 清理 dbMap、事务状态、dbIdMap、invalidOpenDbErrors 及调试信息的所有相关条目
    * @param dbName 数据库名称
    */
   private static removeDatabaseFromMemoryByDatabaseName(dbName: string) {
     DatabaseHelper.dbMap.delete(dbName);
     DatabaseHelper.clearAllTransactionStateByDbName(dbName);
 
-    // 遍历清理所有匹配 dbName 的 dbId 和 invalidOpenDbErrors
+    // 遍历清理所有匹配 dbName 的 dbId 和相关映射
     const dbIdsToRemove: number[] = [];
     DatabaseHelper.dbIdMap.forEach((name: string, id: number) => {
       if (name === dbName) {
@@ -493,8 +545,7 @@ export class DatabaseHelper {
       }
     });
     dbIdsToRemove.forEach((id: number) => {
-      DatabaseHelper.dbIdMap.remove(id);
-      DatabaseHelper.invalidOpenDbErrors.remove(id);
+      DatabaseHelper.removeDatabaseMappingsByDbId(id);
     });
   }
 }
