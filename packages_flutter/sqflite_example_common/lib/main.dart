@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:sqflite_example_common/batch_test_page.dart';
+import 'package:sqflite_example_common/debug_info_test_page.dart';
 import 'package:sqflite_example_common/deprecated_test_page.dart';
 import 'package:sqflite_example_common/exception_test_page.dart';
 import 'package:sqflite_example_common/exp_test_page.dart';
@@ -83,6 +84,9 @@ const String testOpenDatabaseBehaviorRoute = '/test/open_database_behavior';
 /// Open error verify test page.
 const String testOpenErrorVerifyRoute = '/test/open_error_verify';
 
+/// Debug info test page.
+const String testDebugInfoRoute = '/test/debug_info';
+
 /// Extra routes added by the application.
 Map<String, WidgetBuilder>? extraRoutes;
 
@@ -106,6 +110,8 @@ class _SqfliteExampleAppState extends State<SqfliteExampleApp> {
         const MultiDbTransactionTestPage(),
     testOpenErrorVerifyRoute: (BuildContext context) =>
         const OhosOpenErrorVerifyPage(),
+    testDebugInfoRoute: (BuildContext context) =>
+        const DebugInfoTestPage(),
   }..addAll(extraRoutes ?? {});
 
   @override
@@ -210,6 +216,13 @@ class MyHomePage extends StatefulWidget {
         '鸿蒙 openDatabase 错误测试',
         '测试鸿蒙 RDB openDatabase错误场景',
         route: testOpenErrorVerifyRoute,
+      ),
+    );
+    _items.add(
+      MainItem(
+        'Debug 信息验证测试',
+        '验证 debug 返回完整路径、singleInstance、logLevel',
+        route: testDebugInfoRoute,
       ),
     );
     if (extraRoutes != null) {

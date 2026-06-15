@@ -511,10 +511,14 @@ class _MultiDbTransactionTestPageState
         final databases = result['databases'] as Map<Object?, Object?>;
         databases.forEach((dbId, info) {
           if (info is Map<Object?, Object?>) {
-            final dbName = info['path'] as String?;
+            final dbPath = info['path'] as String?;
             final depth = info['transactionDepth'] as int?;
-            if (dbName != null && depth != null) {
-              depths[dbName] = depth;
+            if (dbPath != null && depth != null) {
+              // 使用路径的最后部分作为键（如 'db_a.db'）
+              // 同时保留完整路径作为键，以便两种查找方式都能工作
+              final shortName = dbPath.split('/').last;
+              depths[shortName] = depth;
+              depths[dbPath] = depth;
             }
           }
         });
