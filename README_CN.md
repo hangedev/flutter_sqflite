@@ -23,6 +23,6 @@ BSD 2-Clause License
 见 [LICENSE](LICENSE)
 
 ## Ohos 文档
-[中文](./README_OpenHarmony_CN.md)  
+[中文](./README.OpenHarmony_CN.md)  
 
-[EN](./README_OpenHarmony.md)
+[EN](./README.OpenHarmony.md)

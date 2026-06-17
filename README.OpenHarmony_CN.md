@@ -20,6 +20,8 @@ dependencies:
   sqflite:
     git:
       url: "https://gitcode.com/CPF-Flutter/flutter_sqflite.git"
+      # ref: 2.4.1-ohos-1.0.0-beta.1
+      ref: TAG  # 请根据下方TAG版本对应表选择TAG
       path: sqflite
 ```
 
@@ -28,6 +30,13 @@ dependencies:
 ```bash
 flutter pub get
 ```
+
+### TAG 版本对应表
+
+| Flutter 框架版本 | TAG                       | 分支              |
+|--------------|---------------------------|-----------------|
+| 3.7          | 2.4.1-ohos-1.0.0-beta.1   | br_v2.4.1_ohos   |
+| 3.22         | 2.4.1-ohos-1.0.0-beta.1   | br_v2.4.1_ohos   |
 
 ## 约束与限制
 
@@ -95,7 +104,7 @@ var db = await openDatabase('my_db.db');
 
 在打开文件时，有一个基本的迁移机制来处理模式变更。
 
-许多应用程序使用一个数据库，并且可能永远不会需要关闭它（当应用程序终止时，它将被关闭）。如果你想释放资源，可以关闭数据库。
+许多应用程序使用一个数据库，并且可能不会需要关闭它（当应用程序终止时，它将被关闭）。如果想释放资源，可以关闭数据库。
 
 ```dart
 await db.close();
@@ -273,7 +282,7 @@ mutable['age'] = 30;
 |----------------|-------------------------------------|-----| --- | --- |
 | version        | int?                                   | 否   | yes | 数据库版本，必须为大于 0 的 32 位整数 |
 | onConfigure    | [OnDatabaseConfigureFn](#回调类型)?     | 否   | yes | 数据库配置回调，参数：`Database db` |
-| onCreate       | [OnDatabaseCreateFn](#回调类型)?        | 否   | yes | 数据库首次创建回调，参数：`Database db, int version` |
+| onCreate       | [OnDatabaseCreateFn](#回调类型)?        | 否   | yes | 数据库创建回调，参数：`Database db, int version` |
 | onUpgrade      | [OnDatabaseVersionChangeFn](#回调类型)? | 否   | yes | 数据库版本升级回调，参数：`Database db, int oldVersion, int newVersion` |
 | onDowngrade    | [OnDatabaseVersionChangeFn](#回调类型)? | 否   | yes | 数据库版本降级回调，参数：`Database db, int oldVersion, int newVersion` |
 | onOpen         | [OnDatabaseOpenFn](#回调类型)?          | 否   | yes | 数据库打开完成回调，参数：`Database db` |
@@ -344,8 +353,8 @@ mutable['age'] = 30;
 
 | 回调                        | 参数类型                                                                                 | OpenHarmony平台支持 | 描述 |
 |---------------------------|--------------------------------------------------------------------------------------| --- | --- |
-| OnDatabaseConfigureFn     | FutureOr\<void\> Function([Database](#database) db)                                  | yes | 参数：`Database db`；返回：`FutureOr<void>`；数据库打开后、其他回调之前触发 |
-| OnDatabaseCreateFn        | FutureOr\<void\> Function([Database](#database) db, int version)                     | yes | 参数：`Database db, int version`；返回：`FutureOr<void>`；数据库首次创建时触发 |
+| OnDatabaseConfigureFn     | FutureOr\<void\> Function([Database](#database) db)                                  | yes | 参数：`Database db`；返回：`FutureOr<void>`；数据库打开后、其它回调之前触发 |
+| OnDatabaseCreateFn        | FutureOr\<void\> Function([Database](#database) db, int version)                     | yes | 参数：`Database db, int version`；返回：`FutureOr<void>`；数据库创建时触发 |
 | OnDatabaseVersionChangeFn | FutureOr\<void\> Function([Database](#database) db, int oldVersion, int newVersion); | yes | 参数：`Database db, int oldVersion, int newVersion`；返回：`FutureOr<void>`；数据库升级或降级时触发 |
 | OnDatabaseOpenFn          | FutureOr\<void\> Function([Database](#database) db)                                  | yes | 参数：`Database db`；返回：`FutureOr<void>`；数据库打开完成后触发 |
 
@@ -379,8 +388,8 @@ sqflite
 ├── sqflite_common_test/        # 公共测试用例
 ├── sqflite_support/            # 支撑库与辅助测试代码
 ├── sqflite_test_app/           # 插件集成测试应用
-├── README_OpenHarmony_CN.md   # 中文文档
-├── README_OpenHarmony.md      # 英文文档
+├── README.OpenHarmony_CN.md   # 中文文档
+├── README.OpenHarmony.md      # 英文文档
 ```
 
 ## 贡献代码
