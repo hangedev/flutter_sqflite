@@ -19,6 +19,6 @@ Supports iOS, Android and MacOS.
 
 
 ## Ohos Documentation
-[中文](./README_OpenHarmony_CN.md)  
+[中文](./README.OpenHarmony_CN.md)  
 
-[EN](./README_OpenHarmony.md)
+[EN](./README.OpenHarmony.md)

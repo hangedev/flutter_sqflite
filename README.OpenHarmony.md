@@ -20,6 +20,8 @@ dependencies:
   sqflite:
     git:
       url: "https://gitcode.com/CPF-Flutter/flutter_sqflite.git"
+      # ref: 2.4.1-ohos-1.0.0-beta.1
+      ref: TAG   # Please select the TAG to the TAG Version Mapping
       path: sqflite
 ```
 
@@ -28,6 +30,13 @@ Execute Command
 ```bash
 flutter pub get
 ```
+
+### TAG Version Mapping
+
+| Flutter Framework Version | TAG                       | Branch           |
+|---------------------------|---------------------------|------------------|
+| 3.7                       | 2.4.1-ohos-1.0.0-beta.1   | br_v2.4.1_ohos   |
+| 3.22                      | 2.4.1-ohos-1.0.0-beta.1   | br_v2.4.1_ohos   |
 
 ## Constraints
 
@@ -368,8 +377,8 @@ sqflite
 ├── sqflite_common_test/        # Shared test cases
 ├── sqflite_support/            # Support library and auxiliary test code
 ├── sqflite_test_app/           # Plugin integration test app
-├── README_OpenHarmony_CN.md   # Chinese documentation
-├── README_OpenHarmony.md      # English documentation
+├── README.OpenHarmony_CN.md   # Chinese documentation
+├── README.OpenHarmony.md      # English documentation
 ```
 
 ## How to Contribute
