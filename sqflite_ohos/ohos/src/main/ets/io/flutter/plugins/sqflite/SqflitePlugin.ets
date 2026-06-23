@@ -23,7 +23,7 @@ import MethodChannel, {
   MethodResult
 } from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodChannel';
 import { DatabaseHelper } from './DatabaseHelper';
-import { Constant } from './OhosConstant';
+import { Constant } from './Constant';
 import MethodCall from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodCall';
 import { Database } from './Database';
 import { MethodCallOperation } from './operation/MethodCallOperation';

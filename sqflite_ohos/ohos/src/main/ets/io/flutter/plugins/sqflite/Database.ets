@@ -18,7 +18,7 @@ import relationalStore from '@ohos.data.relationalStore';
 import { Operation } from './operation/Operation';
 import { SqlCommand } from './SqlCommand';
 import { ValueType } from '@ohos.data.ValuesBucket';
-import { Constant } from './OhosConstant';
+import { Constant } from './Constant';
 import { BusinessError } from '@ohos.base';
 import { MethodResult } from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodChannel';
 import MethodCall from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodCall';
@@ -72,7 +72,8 @@ export class Database {
     new DetachHandler()
   ];
 
-  private static async handleException(operation: Operation, err: BusinessError<void>, db?: relationalStore.RdbStore): Promise<void> {
+  private static async handleException(operation: Operation, err: BusinessError<void>,
+    db?: relationalStore.RdbStore): Promise<void> {
     let code = err.code;
     let message = err.message;
     if (code == Constant.RDB_ERROR_CODE_14800000) {
@@ -87,27 +88,29 @@ export class Database {
       // 映射为 sqlite_error + "file is not a database"，与 Android/iOS 的查询阶段错误格式一致
       operation.error(Constant.SQLITE_ERROR, 'file is not a database', SqlErrorInfo.getMap(operation));
     } else if (code == Constant.RDB_ERROR_CODE_801) {
-      operation.error(Constant.SQLITE_ERROR, 'error code:' + code + '。' + " Database is readonly", SqlErrorInfo.getMap(operation));
+      operation.error(Constant.SQLITE_ERROR, 'error code:' + code + '。' + " Database is readonly",
+        SqlErrorInfo.getMap(operation));
     } else {
       operation.error(Constant.SQLITE_ERROR, 'error code:' + code + '。' + message, SqlErrorInfo.getMap(operation));
     }
   }
 
-    /**
+  /**
    * 处理表不存在或语法错误（错误码 14800021）
    */
   private static handleTableOrSyntaxError(operation: Operation, message: string): void {
     let normalizedMessage = message;
-    
+
     // 判断表不存在：Insert failed | updated data does not exist | does not exist
-    if (message.includes('Insert failed') || message.includes('updated data does not') || message.includes('does not exist')) {
+    if (message.includes('Insert failed') || message.includes('updated data does not') ||
+    message.includes('does not exist')) {
       normalizedMessage = Database.normalizeTableNotFoundError(operation, message);
-    } else if (message.includes('not supported') || 
-             (message.includes('Generic error') && !message.includes('Insert failed'))) {
+    } else if (message.includes('not supported') ||
+      (message.includes('Generic error') && !message.includes('Insert failed'))) {
       // 判断语法错误：not supported 或 纯粹的 Generic error（不包含 Insert failed）
       normalizedMessage = `syntax error`;
     }
-    
+
     operation.error(Constant.SQLITE_ERROR, normalizedMessage, SqlErrorInfo.getMap(operation));
   }
 
@@ -119,7 +122,7 @@ export class Database {
     const sql = operation.getSqlCommand()?.getSql() || '';
     // 从 SQL 中提取表名
     const tableMatch = sql.match(/(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM|FROM|CREATE\s+TABLE)\s+(\w+)/i);
-    
+
     if (tableMatch) {
       const tableName = tableMatch[1];
       // 检查表名是否为SQLite保留字(完整列表)
@@ -142,22 +145,22 @@ export class Database {
     const sql = operation.getSqlCommand()?.getSql() || '';
     let resultCode = Constant.SQLITE_CONSTRAINT_UNIQUE;
     let errorMessage = 'UNIQUE constraint failed';
-    
+
     const insertMatch = sql.match(/INSERT\s+INTO\s+(\w+)\s*\((\w+)\)/i);
-    
+
     if (insertMatch && db) {
       const tableName = insertMatch[1];
       const columnName = insertMatch[2];
-      
+
       // 检查列是否为主键
       const isPrimaryKey = await Database.checkIfPrimaryKey(db, tableName, columnName);
       if (isPrimaryKey) {
         resultCode = Constant.SQLITE_CONSTRAINT_PRIMARYKEY; // 1555
       }
-      
+
       errorMessage = `UNIQUE constraint failed: ${tableName}.${columnName}`;
     }
-    
+
     const finalMessage = `${errorMessage} (code ${resultCode})`;
     operation.error(Constant.SQLITE_ERROR, finalMessage, SqlErrorInfo.getMap(operation));
   }
@@ -165,7 +168,8 @@ export class Database {
   /**
    * 检查列是否为主键
    */
-  private static async checkIfPrimaryKey(db: relationalStore.RdbStore, tableName: string, columnName: string): Promise<boolean> {
+  private static async checkIfPrimaryKey(db: relationalStore.RdbStore, tableName: string,
+    columnName: string): Promise<boolean> {
     try {
       const resultSet = await db.querySql(`PRAGMA table_info(${tableName})`);
       while (resultSet.goToNextRow()) {
@@ -190,9 +194,9 @@ export class Database {
   private static isDDL(sql: string): boolean {
     const upperSql = sql.trim().toUpperCase();
     return upperSql.startsWith('CREATE ') ||
-           upperSql.startsWith('DROP ') ||
-           upperSql.startsWith('ALTER ') ||
-           upperSql.startsWith('TRUNCATE ');
+    upperSql.startsWith('DROP ') ||
+    upperSql.startsWith('ALTER ') ||
+    upperSql.startsWith('TRUNCATE ');
   }
 
   private static async executeOrError(operation: Operation, db: relationalStore.RdbStore,
@@ -204,7 +208,7 @@ export class Database {
     try {
       // DDL 语句(CREATE/DROP/ALTER)需要使用 executeSql
       const isDDL = Database.isDDL(sql);
-      
+
       if (isDDL) {
         // executeSql 不支持参数，DDL 语句通常也不需要参数
         await db.executeSql(sql);
@@ -245,7 +249,8 @@ export class Database {
   public static async execute(operation: Operation, db: relationalStore.RdbStore): Promise<void> {
     const sql = operation.getSqlCommand().getSql();
     const inTransactionChangeValue: object = operation.getArgument<object>(Constant.PARAM_IN_TRANSACTION_CHANGE);
-    const inTransactionChange: boolean | null = (typeof inTransactionChangeValue === 'boolean') ? inTransactionChangeValue as boolean : null;
+    const inTransactionChange: boolean | null =
+      (typeof inTransactionChangeValue === 'boolean') ? inTransactionChangeValue as boolean : null;
     const enteringTransaction: boolean = (inTransactionChange === true) && operation.hasNullTransactionId();
 
     if (enteringTransaction) {
@@ -260,7 +265,7 @@ export class Database {
     } else {
       success = await Database.executeOrError(operation, db);
     }
-    
+
     if (handler?.needsPostProcess ?? true) {
       if (success && inTransactionChange !== null) {
         const dbId: number | undefined = operation.getArgument<number>(Constant.PARAM_ID);
@@ -320,7 +325,7 @@ export class Database {
   }
 
   private static async doInsert(operation: Operation, db: relationalStore.RdbStore): Promise<boolean> {
-    let rowIdResult: number = 0; 
+    let rowIdResult: number = 0;
     // 使用 callback 捕获 executeOrError 返回的 rowId
     let executeSuccess: boolean = await Database.executeOrError(operation, db, (rowId) => {
       rowIdResult = rowId as number;
@@ -334,13 +339,13 @@ export class Database {
       operation.success(null);
       return true;
     }
-    
+
     // 如果 rowId <= 0 (比如 ON CONFLICT IGNORE),直接返回 null 与android 和IOS 保持一致
     if (rowIdResult <= 0) {
       operation.success(null);
       return true;
     }
-    
+
     // 正常情况,返回 executeOrError 已经设置的 rowId
     operation.success(rowIdResult);
     return true;
@@ -376,36 +381,36 @@ export class Database {
   public static queryCursorNext(operation: Operation): void {
     const cursorId: number = operation.getArgument(Constant.PARAM_CURSOR_ID);
     const cancel: boolean = operation.getArgument(Constant.PARAM_CANCEL) ?? false;
-    
+
     // 如果是取消操作，关闭并删除游标
     if (cancel) {
       Database.closeCursor(cursorId);
       operation.success(null);
       return;
     }
-    
+
     // 获取保存的 ResultSet
     const resultSet = Database.cursorMap.get(cursorId);
     if (!resultSet) {
       operation.error(Constant.SQLITE_ERROR, `Cursor not found: ${cursorId}`, SqlErrorInfo.getMap(operation));
       return;
     }
-    
+
     const cursorPageSize: number | undefined = operation.getArgument(Constant.PARAM_CURSOR_PAGE_SIZE);
     let cursorHasMoreData = false;
-    
+
     try {
       // 继续读取下一页数据
       let results = Database.handleQuerySqlResult(resultSet, cursorPageSize);
-      
+
       // 判断是否还有更多数据
       cursorHasMoreData = !resultSet.isAtLastRow;
-      
+
       if (cursorHasMoreData) {
         // 继续保存 cursorId
         results.set(Constant.PARAM_CURSOR_ID, cursorId as Object);
       }
-      
+
       operation.success(results);
     } catch (err) {
       Database.handleException(operation, err as BusinessError<void>);
@@ -417,7 +422,7 @@ export class Database {
       }
     }
   }
-  
+
   /// closeCursor - 关闭并删除游标
   private static closeCursor(cursorId: number): void {
     const resultSet = Database.cursorMap.get(cursorId);
@@ -451,7 +456,8 @@ export class Database {
   /**
    * 执行 SQL 查询并返回 ResultSet
    */
-  private static async executeQuery(sql: string, sqlArguments: ValueType[] | undefined, db: relationalStore.RdbStore): Promise<relationalStore.ResultSet> {
+  private static async executeQuery(sql: string, sqlArguments: ValueType[] | undefined,
+    db: relationalStore.RdbStore): Promise<relationalStore.ResultSet> {
     if (sqlArguments != undefined) {
       return await db.querySql(sql, sqlArguments);
     } else {
@@ -523,7 +529,8 @@ export class Database {
   /**
    * 处理游标分页（保存 ResultSet 以便后续分页）
    */
-  private static handleCursorPagination(resultSet: relationalStore.ResultSet, cursorPageSize: number | undefined, results: Map<String, object>): number | null {
+  private static handleCursorPagination(resultSet: relationalStore.ResultSet, cursorPageSize: number | undefined,
+    results: Map<String, object>): number | null {
     // 判断是否需要保存 ResultSet
     let cursorHasMoreData = false;
     if (cursorPageSize != null && cursorPageSize > 0) {
@@ -538,7 +545,7 @@ export class Database {
       results.set(Constant.PARAM_CURSOR_ID, savedCursorId as Object);
       return savedCursorId;
     }
-    
+
     return null;
   }
 
@@ -575,7 +582,8 @@ export class Database {
       return true;
 
     } catch (err) {
-      Log.e('Database', `doQuery caught exception: code=${(err as BusinessError<void>).code}, message=${(err as BusinessError<void>).message}`);
+      Log.e('Database',
+        `doQuery caught exception: code=${(err as BusinessError<void>).code}, message=${(err as BusinessError<void>).message}`);
       Database.handleException(operation, err);
       // 异常时清理
       if (savedCursorId != null) {

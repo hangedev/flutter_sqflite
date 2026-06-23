@@ -17,7 +17,7 @@ import { Operation } from './operation/Operation';
 import { relationalStore } from '@kit.ArkData';
 import { Tools } from './Tools';
 import { BusinessError } from '@kit.BasicServicesKit';
-import { Constant } from './OhosConstant';
+import { Constant } from './Constant';
 
 /// 每个 Handler 都要实现 match + execute
 export interface ISqlHandler {

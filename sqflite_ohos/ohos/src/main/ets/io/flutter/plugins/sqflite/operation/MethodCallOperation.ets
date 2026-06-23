@@ -19,7 +19,7 @@ import { MethodResult } from '@ohos/flutter_ohos/src/main/ets/plugin/common/Meth
 import { BaseOperation } from './BaseOperation';
 import { OperationResult } from './OperationResult';
 import { deviceInfo } from '@kit.BasicServicesKit';
-import { Constant } from '../OhosConstant';
+import { Constant } from '../Constant';
 
 export class MethodCallOperation extends BaseOperation {
   public result: Result;

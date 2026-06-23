@@ -19,7 +19,7 @@ import { MethodResult } from '@ohos/flutter_ohos/src/main/ets/plugin/common/Meth
 import { Tools } from './Tools';
 import { BusinessError } from '@ohos.base';
 import { Log } from '@ohos/flutter_ohos';
-import { Constant } from './OhosConstant';
+import { Constant } from './Constant';
 import deviceInfo from '@ohos.deviceInfo';
 import MethodCall from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodCall';
 import fs from '@ohos.file.fs';
@@ -190,6 +190,7 @@ export class DatabaseHelper {
       return null;
     }
   }
+
   // 根据数据库 id 维护事务深度。
   // 当 execute 成功进入事务时深度 +1，提交或回滚成功时深度 -1。
   // 这里按 dbName 记录而不是用全局状态，避免多个数据库之间互相污染。
@@ -489,7 +490,7 @@ export class DatabaseHelper {
       if (dbName == value) {
         id = key ?? -1;
       }
-    })
+    });
     return id;
   }
 
