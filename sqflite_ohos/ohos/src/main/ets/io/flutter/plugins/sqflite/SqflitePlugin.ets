@@ -99,26 +99,42 @@ export default class SqflitePlugin implements FlutterPlugin, MethodCallHandler {
     }
   }
 
-  ///打开数据库
+  /**
+   * 打开数据库
+   * @param call 方法调用对象
+   * @param result 方法结果对象
+   */
   async handleOpenDatabaseCall(call: MethodCall, result: MethodResult): Promise<void> {
     await DatabaseHelper.openDatabase(this.context!, call, result);
   }
 
-  ///获取数据库路径
+  /**
+   * 获取数据库路径
+   * @param call 方法调用对象
+   * @param result 方法结果对象
+   */
   handleGetDatabasesPathCall(call: MethodCall, result: MethodResult) {
     let appContext = this.context!.getApplicationContext();
     let path: string = appContext.databaseDir + "/rdb";
     result.success(path);
   }
 
-  ///检查数据库是否存在
+  /**
+   * 检查数据库是否存在
+   * @param call 方法调用对象
+   * @param result 方法结果对象
+   */
   async handleDatabaseExistsCall(call: MethodCall, result: MethodResult): Promise<void> {
     let dbPath: string = call.argument(Constant.PARAM_PATH);
     let isExist: boolean = await DatabaseHelper.checkDatabaseExisted(dbPath);
     result.success(isExist);
   }
 
-  ///执行Sql
+  /**
+  * 执行Sql
+  * @param call 方法调用对象
+  * @param result 方法结果对象
+  */
   async handleExecuteCall(call: MethodCall, result: MethodResult): Promise<void> {
     let rdbStore = DatabaseHelper.getDatabaseOrError(call, result);
     if (rdbStore == null) {
@@ -129,7 +145,11 @@ export default class SqflitePlugin implements FlutterPlugin, MethodCallHandler {
     Database.execute(operation, rdbStore);
   }
 
-  ///插入数据
+  /**
+   * 插入数据
+   * @param call 方法调用对象
+   * @param result 方法结果对象
+   */
   async handleInsertCall(call: MethodCall, result: MethodResult): Promise<void> {
     let rdbStore = DatabaseHelper.getDatabaseOrError(call, result);
     if (rdbStore == null) {
@@ -140,7 +160,11 @@ export default class SqflitePlugin implements FlutterPlugin, MethodCallHandler {
     Database.insert(operation, rdbStore);
   }
 
-  ///查询数据
+  /**
+  * 查询数据
+  * @param call 方法调用对象
+  * @param result 方法结果对象
+  */
   async handleQueryCall(call: MethodCall, result: MethodResult): Promise<void> {
     let rdbStore = DatabaseHelper.getDatabaseOrError(call, result);
     if (rdbStore == null) {
@@ -151,13 +175,21 @@ export default class SqflitePlugin implements FlutterPlugin, MethodCallHandler {
     Database.query(operation, rdbStore);
   }
 
-  ///查询游标下一页数据
+  /**
+  * 查询游标下一页数据
+  * @param call 方法调用对象
+  * @param result 方法结果对象
+  */
   async handleQueryCursorNextCall(call: MethodCall, result: MethodResult): Promise<void> {
     let operation: MethodCallOperation = new MethodCallOperation(call, result);
     Database.queryCursorNext(operation);
   }
 
-  ///更新（包括删除）数据
+  /**
+   * 更新（包括删除）数据
+   * @param call 方法调用对象
+   * @param result 方法结果对象
+   */
   async handleUpdateCall(call: MethodCall, result: MethodResult): Promise<void> {
     let rdbStore = DatabaseHelper.getDatabaseOrError(call, result);
     if (rdbStore == null) {
@@ -168,7 +200,11 @@ export default class SqflitePlugin implements FlutterPlugin, MethodCallHandler {
     Database.update(operation, rdbStore);
   }
 
-  ///batch操作
+  /**
+   * batch操作
+   * @param call 方法调用对象
+   * @param result 方法结果对象
+   */
   async handleBatchCall(call: MethodCall, result: MethodResult): Promise<void> {
     let rdbStore = DatabaseHelper.getDatabaseOrError(call, result);
     if (rdbStore == null) {
@@ -177,27 +213,49 @@ export default class SqflitePlugin implements FlutterPlugin, MethodCallHandler {
     Database.batch(call, result, rdbStore);
   }
 
-  ///Options操作，设置LogLevel，仅限开发，已废弃
+  /**
+   * Options操作，设置LogLevel，仅限开发，已废弃
+   * @param call 方法调用对象
+   * @param result 方法结果对象
+   */
   async handleOptionsCall(call: MethodCall, result: MethodResult): Promise<void> {
     DatabaseHelper.options(call, result);
   }
 
-  ///Debug操作，获取数据库信息
+  /**
+  * Debug操作，获取数据库信息
+  * @param call 方法调用对象
+  * @param result 方法结果对象
+  */
   async handleDebugCall(call: MethodCall, result: MethodResult): Promise<void> {
     DatabaseHelper.onDebug(call, result);
   }
 
-  ///设置debug模式，已废弃
+  /**
+   * 设置debug模式，已废弃
+   * @param call 方法调用对象
+   * @param result 方法结果对象
+   */
   async handleDebugModeCall(call: MethodCall, result: MethodResult): Promise<void> {
     DatabaseHelper.debugMode(call, result);
   }
 
-  ///获取设备信息
+  /**
+   * 获取设备信息
+   * @param call 方法调用对象
+   * @param result 方法结果对象
+   */
   async handleGetPlatformVersionCall(call: MethodCall, result: MethodResult): Promise<void> {
     DatabaseHelper.getPlatformVersion(call, result);
   }
 
-  ///关闭数据库
+
+
+  /**
+   * 关闭数据库
+   * @param call 方法调用对象
+   * @param result 方法结果对象
+   */
   async handleCloseDatabaseCall(call: MethodCall, result: MethodResult): Promise<void> {
     let rdbStore = DatabaseHelper.getDatabaseOrError(call, result);
     if (rdbStore == null) {

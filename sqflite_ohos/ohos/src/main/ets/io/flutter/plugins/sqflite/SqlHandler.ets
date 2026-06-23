@@ -19,17 +19,36 @@ import { Tools } from './Tools';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { Constant } from './Constant';
 
-/// 每个 Handler 都要实现 match + execute
+/**
+ * 每个 Handler 都要实现 match + execute
+ */
 export interface ISqlHandler {
-  // 如果能处理此 SQL，就返回 true
+  /**
+   * 如果能处理此 SQL，就返回 true
+   * @param sql SQL 语句
+   * @returns true 表示能处理此 SQL，false 表示不能处理
+   */
   match(sql: string): boolean;
-  // 执行逻辑，返回是否执行成功
+
+  /**
+   * 执行逻辑，返回是否执行成功
+   * @param sql SQL 语句
+   * @param operation 操作对象
+   * @param db 数据库实例
+   * @returns 执行成功返回 true，失败返回 false
+   */
   execute( sql: string, operation: Operation, db: relationalStore.RdbStore): Promise<boolean> | boolean;
-  // 默认 false，表示不走后处理；某些 Handler 可以覆盖为 true
+
+  /**
+   * 默认 false，表示不走后处理；某些 Handler 可以覆盖为 true
+   * @returns 是否需要后处理
+   */
   get needsPostProcess(): boolean;
 }
 
-/// 抽象 Handler，提供默认 no-op 实现
+/**
+ * 抽象 Handler，提供默认 no-op 实现
+ */
 abstract class BaseSqlHandler implements ISqlHandler {
   match(sql: string): boolean {
     return false;
@@ -44,7 +63,9 @@ abstract class BaseSqlHandler implements ISqlHandler {
   }
 }
 
-/// 事务开始
+/**
+ * 事务开始
+ */
 export class BeginImmediateHandler extends BaseSqlHandler {
   match(sql: string) {
     const upperSql = sql.toUpperCase();
@@ -62,7 +83,9 @@ export class BeginImmediateHandler extends BaseSqlHandler {
   }
 }
 
-/// 提交事务
+/**
+ * 提交事务
+ */
 export class CommitHandler extends BaseSqlHandler {
   match(sql: string) {
     return sql.toUpperCase() === Constant.SQL_COMMIT;
@@ -78,7 +101,9 @@ export class CommitHandler extends BaseSqlHandler {
   }
 }
 
-// 回滚事务
+/**
+ * 回滚事务
+ */
 export class RollbackHandler extends BaseSqlHandler {
   match(sql: string) {
     return sql.toUpperCase() === Constant.SQL_ROLLBACK;
@@ -98,7 +123,9 @@ export class RollbackHandler extends BaseSqlHandler {
   }
 }
 
-/// BEGIN EXCLUSIVE
+/**
+ * BEGIN EXCLUSIVE
+ */
 export class BeginExclusiveHandler extends BaseSqlHandler {
   match(sql: string) {
     const upperSql = sql.toUpperCase();

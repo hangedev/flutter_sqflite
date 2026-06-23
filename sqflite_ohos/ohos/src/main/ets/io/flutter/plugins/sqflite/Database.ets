@@ -245,7 +245,11 @@ export class Database {
     }
   }
 
-  /// execute
+  /**
+   * execute
+   * @param operation 操作对象
+   * @param db 数据库实例
+   */
   public static async execute(operation: Operation, db: relationalStore.RdbStore): Promise<void> {
     const sql = operation.getSqlCommand().getSql();
     const inTransactionChangeValue: object = operation.getArgument<object>(Constant.PARAM_IN_TRANSACTION_CHANGE);
@@ -319,7 +323,11 @@ export class Database {
     return true;
   }
 
-  /// insert
+  /**
+   * insert
+   * @param operation 操作对象
+   * @param db 数据库实例
+   */
   public static insert(operation: Operation, db: relationalStore.RdbStore): void {
     Database.doInsert(operation, db);
   }
@@ -351,7 +359,11 @@ export class Database {
     return true;
   }
 
-  /// update
+  /**
+   * update
+   * @param operation 操作对象
+   * @param db 数据库实例
+   */
   public static update(operation: Operation, db: relationalStore.RdbStore): void {
     Database.doUpdate(operation, db);
   }
@@ -372,12 +384,19 @@ export class Database {
     return true;
   }
 
-  /// query
+  /**
+   * query
+   * @param operation 操作对象
+   * @param db 数据库实例
+   */
   public static async query(operation: Operation, db: relationalStore.RdbStore): Promise<void> {
     Database.doQuery(operation, db);
   }
 
-  /// queryCursorNext - 获取游标的下一页数据
+  /**
+   * queryCursorNext - 获取游标的下一页数据
+   * @param operation 操作对象
+  */
   public static queryCursorNext(operation: Operation): void {
     const cursorId: number = operation.getArgument(Constant.PARAM_CURSOR_ID);
     const cancel: boolean = operation.getArgument(Constant.PARAM_CANCEL) ?? false;
@@ -423,7 +442,10 @@ export class Database {
     }
   }
 
-  /// closeCursor - 关闭并删除游标
+  /**
+   * closeCursor - 关闭并删除游标
+   * @param cursorId 游标ID
+   */
   private static closeCursor(cursorId: number): void {
     const resultSet = Database.cursorMap.get(cursorId);
     if (resultSet) {

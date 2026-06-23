@@ -14,7 +14,17 @@
 */
 
 export interface OperationResult {
+  /**
+   * 报告错误结果
+   * @param errorCode 错误代码
+   * @param errorMessage 错误消息
+   * @param data 错误数据
+   */
   error(errorCode: string, errorMessage: string, data: Object): void;
 
+  /**
+   * 报告成功结果
+   * @param result 结果对象，可以为 null
+   */
   success(result: Object | null): void;
 }
