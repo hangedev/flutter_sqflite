@@ -78,7 +78,7 @@ export class Constant {
   static PARAM_LOG_LEVEL: string = "logLevel"; // int
   static PARAM_THREAD_PRIORITY: string = "androidThreadPriority"; // int
   static PARAM_THREAD_COUNT: string = "androidThreadCount"; // int
-  static PARAM_USER_VERSION = "user_version";
+  static PARAM_USER_VERSION: string = "user_version";
   //debugMode
   static PARAM_CMD: string = "cmd"; // debugMode cmd:get/set
   static CMD_GET: string = "get";
@@ -96,17 +96,17 @@ export class Constant {
   static SQL_BEGIN_EXCLUSIVE: string = "BEGIN EXCLUSIVE";
   static SQL_ATTACH: string = "ATTACH";
   static SQL_DETACH: string = "DETACH";
-  static SQL_PRAGMA_USER_VERSION = "PRAGMA user_version";
-  static API_17 = 17;
-  static API_20 = 20;
-  static DB_PATH_PARSING_BEGIN_INDEX = 6;
-  static RDB_ERROR_CODE_801 = 801;
-  static RDB_ERROR_CODE_14800000 = 14800000;
-  static RDB_ERROR_CODE_14800011 = 14800011;
-  static RDB_ERROR_CODE_14800021 = 14800021;
-  static RDB_ERROR_CODE_14800032 = 14800032;
-  static SQLITE_CONSTRAINT_UNIQUE = 2067;
-  static SQLITE_CONSTRAINT_PRIMARYKEY = 1555;
+  static SQL_PRAGMA_USER_VERSION: string = "PRAGMA user_version";
+  static API_17: number = 17;
+  static API_20: number = 20;
+  static DB_PATH_PARSING_BEGIN_INDEX: number = 6;
+  static RDB_ERROR_CODE_801: number = 801;
+  static RDB_ERROR_CODE_14800000: number = 14800000;
+  static RDB_ERROR_CODE_14800011: number = 14800011;
+  static RDB_ERROR_CODE_14800021: number = 14800021;
+  static RDB_ERROR_CODE_14800032: number = 14800032;
+  static SQLITE_CONSTRAINT_UNIQUE: number = 2067;
+  static SQLITE_CONSTRAINT_PRIMARYKEY: number = 1555;
   static SQL_RESERVED_WORDS: string[] = ['add', 'all', 'alter', 'and', 'as', 'autoincrement', 'between', 
     'case', 'check', 'collate', 'commit', 'constraint', 'create', 'default', 'deferrable', 
     'delete', 'distinct', 'drop', 'else', 'escape', 'except', 'exists', 'foreign', 'from', 
