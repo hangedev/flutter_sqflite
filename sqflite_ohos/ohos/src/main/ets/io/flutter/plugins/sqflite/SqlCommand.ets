@@ -20,6 +20,11 @@ export class SqlCommand {
   sql: string;
   rawArguments: Array<ValueType>;
 
+  /**
+   * 构造函数
+   * @param sql SQL 语句
+   * @param rawArguments SQL 参数数组
+   */
   constructor(sql: string, rawArguments: Array<ValueType> | undefined) {
     this.sql = sql;
     if(rawArguments == undefined) {
@@ -28,15 +33,27 @@ export class SqlCommand {
     this.rawArguments = rawArguments;
   }
 
-  // Handle list of int as byte[]
+  /**
+   * Handle list of int as byte[]
+   * @param value 值类型
+   * @returns 转换后的值
+   */
   static toValue(value: ValueType): ValueType {
     return value;
   }
 
+  /**
+   * 获取 SQL 语句
+   * @returns SQL 语句字符串
+   */
   public getSql(): string {
     return this.sql;
   }
 
+  /**
+   * 获取原始 SQL 参数
+   * @returns SQL 参数数组
+   */
   public getRawSqlArguments(): Array<Object> {
     return this.rawArguments;
   }

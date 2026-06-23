@@ -52,7 +52,12 @@ export class DatabaseHelper {
   // 用途: 对"已存在的损坏数据库"在 openDatabase 阶段先返回成功，后续操作再返回 sqlite_error
   public static invalidOpenDbErrors: HashMap<number, string> = new HashMap<number, string>();
 
-  // 打开一个数据库
+  /**
+   * 打开一个数据库
+   * @param context 应用上下文
+   * @param call 方法调用对象
+   * @param result 方法结果对象
+   */
   public static async openDatabase(context: common.Context, call: MethodCall, result: MethodResult): Promise<void> {
     if (DatabaseHelper.appContext === null) {
       DatabaseHelper.appContext = context;
@@ -148,13 +153,22 @@ export class DatabaseHelper {
     result.success(map);
   }
 
-  // 检查数据库是否存在
-  public static async checkDatabaseExisted(dbPath: string): Promise<boolean> {
+  /**
+   * 检查数据库是否存在
+   * @param dbPath 数据库路径
+   * @returns true 表示数据库存在，false 表示不存在
+   */
+  checkDatabaseExisted(dbPath: string): Promise<boolean> {
     let isExists: boolean = await fs.access(dbPath);
     return isExists;
   }
 
-  // 从已加载的列表里获取一个数据库
+  /**
+   * 从已加载的列表里获取一个数据库
+   * @param call 方法调用对象
+   * @param result 方法结果对象
+   * @returns 数据库实例，如果不存在则返回 null
+   */
   private static getDatabaseFromMemory(dbName: string): relationalStore.RdbStore | null {
     if (DatabaseHelper.dbMap.has(dbName)) {
       return DatabaseHelper.dbMap.get(dbName) as relationalStore.RdbStore | null;
@@ -191,9 +205,13 @@ export class DatabaseHelper {
     }
   }
 
-  // 根据数据库 id 维护事务深度。
-  // 当 execute 成功进入事务时深度 +1，提交或回滚成功时深度 -1。
-  // 这里按 dbName 记录而不是用全局状态，避免多个数据库之间互相污染。
+  /**
+   * 根据数据库 id 维护事务深度。
+   * 当 execute 成功进入事务时深度 +1，提交或回滚成功时深度 -1。
+   * 这里按 dbName 记录而不是用全局状态，避免多个数据库之间互相污染。
+   * @param dbId 数据库ID
+   * @param inTransactionChange true 表示进入事务，false 表示退出事务
+   */
   public static noteTransactionChangeByDbId(dbId: number, inTransactionChange: boolean): void {
     const dbName: string | undefined = DatabaseHelper.dbIdMap.get(dbId);
     if (dbName === undefined) {
@@ -265,8 +283,12 @@ export class DatabaseHelper {
     }
   }
 
-  // 判断指定数据库当前是否仍处于事务中。
-  // openDatabase 恢复已有单实例数据库时，会据此返回 recoveredInTransaction。
+  /**
+   * 判断指定数据库当前是否仍处于事务中。
+   * openDatabase 恢复已有单实例数据库时，会据此返回 recoveredInTransaction。
+   * @param dbName 数据库名称
+   * @returns true 表示处于事务中，false 表示不在事务中
+   */
   public static isDatabaseInTransaction(dbName: string): boolean {
     return (DatabaseHelper.transactionDepthByDbName.get(dbName) ?? 0) > 0;
   }
@@ -284,7 +306,11 @@ export class DatabaseHelper {
     }
   }
 
-  // 关闭一个数据库
+  /**
+   * 关闭一个数据库
+   * @param call 方法调用对象
+   * @param result 方法结果对象
+   */
   public static async closeDatabase(call: MethodCall, result: MethodResult): Promise<void> {
     let dbId: number = call.argument(Constant.PARAM_ID);
     let dbName: string | undefined = DatabaseHelper.dbIdMap.get(dbId);
@@ -342,7 +368,12 @@ export class DatabaseHelper {
     }
   }
 
-  // 删除一个数据库
+  /**
+   * 删除一个数据库
+   * @param context 应用上下文
+   * @param dbPath 数据库路径
+   * @returns true 表示删除成功，false 表示删除失败
+   */
   public static async deleteDatabase(context: common.Context, dbPath: string): Promise<boolean> {
     let result: boolean = false;
     let dbPathDirList: string[] = dbPath.split('/');
@@ -385,12 +416,20 @@ export class DatabaseHelper {
     }
   }
 
-  // 获取设备版本信息
+  /**
+   * 获取设备版本信息
+   * @param call 方法调用对象
+   * @param result 方法结果对象
+   */
   public static async getPlatformVersion(call: MethodCall, result: MethodResult): Promise<void> {
     result.success('ohos' + deviceInfo.osFullName);
   }
 
-  // Options操作，设置LogLevel，仅限开发，已被废弃
+  /**
+   * Options操作，设置LogLevel，仅限开发，已被废弃
+   * @param call 方法调用对象
+   * @param result 方法结果对象
+   */
   public static async options(call: MethodCall, result: MethodResult): Promise<void> {
     let logLevel: number | undefined = call.argument(Constant.PARAM_LOG_LEVEL);
     if (logLevel !== undefined) {
@@ -399,13 +438,20 @@ export class DatabaseHelper {
     result.success(null);
   }
 
-  // 设置debug模式，查看SQL查询，已弃用
+  /**
+   * 设置debug模式，查看SQL查询，已弃用
+   * @param call 方法调用对象
+   * @param result 方法结果对象
+   */
   public static async debugMode(call: MethodCall, result: MethodResult): Promise<void> {
     let on: boolean = call.args;
     result.success(null);
   }
 
-  // Debug操作,获取数据库信息
+  /** Debug操作,获取数据库信息
+   * @param call 方法调用对象
+   * @param result 方法结果对象
+   */
   public static async onDebug(call: MethodCall, result: MethodResult): Promise<void> {
     let cmd: string = call.argument(Constant.PARAM_CMD);
     let map: Record<string, Object> = {};
