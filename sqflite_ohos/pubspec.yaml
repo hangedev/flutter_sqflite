@@ -3,7 +3,7 @@ repository: https://gitcode.com/openharmony-sig/flutter_sqflite/master/sqflite_o
 issue_tracker: https://gitcode.com/openharmony-sig/flutter_sqflite/issues
 description: Ohos flutter plugin for SQLite, a self-contained, high-reliability,
   embedded, SQL database engine.
-version: 2.4.1
+version: 2.4.2
 
 # This package supports all platforms listed below.
 platforms:
