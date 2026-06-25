@@ -20,7 +20,7 @@ dependencies:
   sqflite:
     git:
       url: "https://gitcode.com/CPF-Flutter/flutter_sqflite.git"
-      # ref: 2.4.1-ohos-1.0.0-beta.1
+      # ref: 2.4.2-ohos.1.0.0-beta.1
       ref: TAG   # Please select the TAG to the TAG Version Mapping
       path: sqflite
 ```
@@ -33,10 +33,12 @@ flutter pub get
 
 ### TAG Version Mapping
 
-| Flutter Framework Version | TAG                       | Branch           |
-|---------------------------|---------------------------|------------------|
-| 3.7                       | 2.4.1-ohos-1.0.0-beta.1   | br_v2.4.1_ohos   |
-| 3.22                      | 2.4.1-ohos-1.0.0-beta.1   | br_v2.4.1_ohos   |
+| Flutter Framework Version | TAG                       | Branch         |
+|---------------------------|---------------------------|----------------|
+| 3.7                       | 2.2.8-ohos-1.0.0-beta.1   | master         |
+| 3.22                      | 2.2.8-ohos-1.0.0-beta.1   | master         |
+| 3.27                      | 2.4.2-ohos.1.0.0-beta.1   | br_v2.4.2_ohos |
+| 3.35                      | 2.4.2-ohos.1.0.0-beta.1   | br_v2.4.2_ohos |
 
 ## Constraints
 
@@ -45,6 +47,7 @@ flutter pub get
 This document is verified based on the following versions:
 
 1. Flutter: 3.7.12-ohos-1.0.6; SDK: 5.0.0(12); IDE: DevEco Studio: 5.0.13.200; ROM: 5.1.0.120 SP3;
+2. Flutter: oh-3.22.0-dev; SDK: 5.0.0(12); DevEco Studio: 6.1.1.280; ROM: 5.1.0.53 SP3;
 
 ### **Permission Requirements**
 
@@ -56,7 +59,7 @@ This document is verified based on the following versions:
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
-Future\<void\> runDemo() async {
+Future<void> runDemo() async {
   final String dbPath = p.join(await getDatabasesPath(), 'demo.db');
   final Database db = await openDatabase(
     dbPath,
@@ -273,6 +276,23 @@ Inherited from [DatabaseExecutor](#databaseexecutortransaction), repeated method
 | current   | Attribute   | - | Map<String, Object?> | yes | Data of the current row. |
 | close     | Function   | - | Future\<void\>       | yes | Close the cursor manually. |
 | moveNext  | Function   | - | Future\<bool\>       | yes | Move to the next row; when false is returned, the cursor closes automatically. |
+
+#### DatabaseException
+
+`DatabaseException` is an abstract class (implementing `Exception`) and sqflite's unified wrapper for native SQLite errors; the OpenHarmony platform uses the concrete implementation `SqfliteDatabaseException`. Any inner exception is thrown wrapped in a `DatabaseException`.
+
+| Name                      | Type | Parameter Type   | Return Value | OpenHarmony Platform Support | Description |
+|---------------------------| --- |---------------|-------| --- | --- |
+| result                    | Attribute | -             | Object? | yes | Platform-specific native error result; content depends on the platform, used internally and for diagnostics. |
+| getResultCode             | Function | -             | int?  | yes | Returns the SQLite result code; Android/FFI return extended codes, iOS returns normal codes, handle both. |
+| isNoSuchTableError        | Function | [String? table] | bool  | yes | Whether it is a "no such table" error; an optional table name can be matched. |
+| isDuplicateColumnError    | Function | [String? column] | bool  | yes | Whether it is a "duplicate column name" error; an optional column name can be matched. |
+| isSyntaxError             | Function | -             | bool  | yes | Whether it is an SQL syntax error. |
+| isOpenFailedError         | Function | -             | bool  | yes | Whether it is a database open-failed error (contains `open_failed`). |
+| isDatabaseClosedError     | Function | -             | bool  | yes | Whether it is a database-closed error. |
+| isReadOnlyError           | Function | -             | bool  | yes | Whether it is a read-only error (contains `readonly`). |
+| isUniqueConstraintError   | Function | [String? field] | bool  | yes | Whether it is a UNIQUE constraint violation; an optional field can be matched. |
+| isNotNullConstraintError  | Function | [String? field] | bool  | yes | Whether it is a NOT NULL constraint violation; an optional field can be matched. |
 
 ### Properties
 #### OpenDatabaseOptions
