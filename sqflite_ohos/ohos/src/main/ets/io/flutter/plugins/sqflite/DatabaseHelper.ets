@@ -158,7 +158,7 @@ export class DatabaseHelper {
    * @param dbPath 数据库路径
    * @returns true 表示数据库存在，false 表示不存在
    */
-  checkDatabaseExisted(dbPath: string): Promise<boolean> {
+  static async checkDatabaseExisted(dbPath: string): Promise<boolean> {
     let isExists: boolean = await fs.access(dbPath);
     return isExists;
   }
