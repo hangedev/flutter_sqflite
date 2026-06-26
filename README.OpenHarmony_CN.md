@@ -20,7 +20,7 @@ dependencies:
   sqflite:
     git:
       url: "https://gitcode.com/CPF-Flutter/flutter_sqflite.git"
-      # ref: 2.4.1-ohos-1.0.0-beta.1
+      # ref: 2.4.2-ohos.1.0.0-beta.1
       ref: TAG  # 请根据下方TAG版本对应表选择TAG
       path: sqflite
 ```
@@ -33,10 +33,12 @@ flutter pub get
 
 ### TAG 版本对应表
 
-| Flutter 框架版本 | TAG                       | 分支              |
-|--------------|---------------------------|-----------------|
-| 3.7          | 2.4.1-ohos-1.0.0-beta.1   | br_v2.4.1_ohos   |
-| 3.22         | 2.4.1-ohos-1.0.0-beta.1   | br_v2.4.1_ohos   |
+| Flutter 框架版本 | TAG                       | 分支             |
+|--------------|---------------------------|----------------|
+| 3.7          | 2.2.8-ohos-1.0.0-beta.1   | master         |
+| 3.22         | 2.2.8-ohos-1.0.0-beta.1   | master         |
+| 3.27         | 2.4.2-ohos.1.0.0-beta.1   | br_v2.4.2_ohos |
+| 3.35         | 2.4.2-ohos.1.0.0-beta.1   | br_v2.4.2_ohos |
 
 ## 约束与限制
 
@@ -45,6 +47,7 @@ flutter pub get
 在以下版本中已测试通过：
 
 - Flutter: 3.7.12-ohos-1.0.6; DevEco Studio: 5.0.13.200; SDK: 5.0.0(12); ROM: 5.1.0.120 SP3;
+- Flutter: oh-3.22.0-dev; DevEco Studio: 6.1.1.280; SDK: 5.0.0(12); ROM: 5.1.0.53 SP3;
 
 ### 权限要求
 
@@ -57,7 +60,7 @@ flutter pub get
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
-Future\<void\> runDemo() async {
+Future<void> runDemo() async {
   final String dbPath = p.join(await getDatabasesPath(), 'demo.db');
   final Database db = await openDatabase(
     dbPath,
@@ -274,6 +277,23 @@ mutable['age'] = 30;
 | current   | 属性   | - | Map<String, Object?> | yes | 当前行数据 |
 | close     | 方法   | - | Future\<void\>       | yes | 手动关闭游标 |
 | moveNext  | 方法   | - | Future\<bool\>       | yes | 移动到下一行，返回 false 时游标自动关闭 |
+
+#### DatabaseException
+
+`DatabaseException` 为抽象类（实现 `Exception`），是 sqflite 对原生 SQLite 错误的统一封装；OpenHarmony 平台使用具体实现 `SqfliteDatabaseException`。任何内部异常都会被包装为 `DatabaseException` 抛出。
+
+| 名称                       | 类型 | 参数类型          | 返回值   | OpenHarmony 平台支持 | 描述 |
+|--------------------------| --- |---------------|-------| --- | --- |
+| result                   | 属性 | -             | Object? | yes | 平台相关的原生错误结果，内容依平台而定，供内部及诊断使用 |
+| getResultCode            | 方法 | -             | int?  | yes | 获取 SQLite 结果码；Android/FFI 为扩展码，iOS 为普通码，需同时处理 |
+| isNoSuchTableError       | 方法 | [String? table] | bool  | yes | 是否为"no such table"错误，可指定表名匹配 |
+| isDuplicateColumnError   | 方法 | [String? column] | bool  | yes | 是否为"duplicate column name"错误，可指定列名匹配 |
+| isSyntaxError            | 方法 | -             | bool  | yes | 是否为 SQL 语法错误 |
+| isOpenFailedError        | 方法 | -             | bool  | yes | 是否为数据库打开失败错误（含 `open_failed`） |
+| isDatabaseClosedError    | 方法 | -             | bool  | yes | 是否为数据库已关闭错误 |
+| isReadOnlyError          | 方法 | -             | bool  | yes | 是否为只读错误（含 `readonly`） |
+| isUniqueConstraintError  | 方法 | [String? field] | bool  | yes | 是否为 UNIQUE 约束冲突，可指定字段匹配 |
+| isNotNullConstraintError | 方法 | [String? field] | bool  | yes | 是否为 NOT NULL 约束冲突，可指定字段匹配 |
 
 ### 属性
 #### OpenDatabaseOptions
