@@ -16,3 +16,9 @@ Supports iOS, Android and MacOS.
 * [Documentation](https://github.com/tekartik/sqflite/blob/master/sqflite/README.md)
 * [API reference](https://pub.dartlang.org/documentation/sqflite/latest/sqflite/sqflite-library.html)
 * [How to](https://github.com/tekartik/sqflite/blob/master/sqflite/doc/how_to.md) guide
+
+## OHOS
+
+- [Chinese](README.OpenHarmony_CN.md)
+ 	 
+- [English](README.OpenHarmony.md)
