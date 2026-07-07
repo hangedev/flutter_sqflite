@@ -13,11 +13,16 @@
 * limitations under the License.
 */
 
-import { Constant } from '../OhosConstant';
+import { Constant } from '../Constant';
 import { SqlCommand } from '../SqlCommand';
 import { Operation } from './Operation';
 
 export class SqlErrorInfo {
+  /**
+   * 获取错误信息映射
+   * @param operation 操作对象
+   * @returns 包含 SQL 语句和参数的错误信息映射
+   */
   public static getMap(operation: Operation): Map<string, Object> {
     let map: Map<string, Object> = new Map();
     let command: SqlCommand = operation.getSqlCommand();

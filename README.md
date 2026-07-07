@@ -2,7 +2,7 @@
 
 [![pub package](https://img.shields.io/pub/v/sqflite.svg)](https://pub.dev/packages/sqflite)
 
-SQLite plugin for [Flutter](https://flutter.io).
+SQLite plugin for [Flutter](https://flutter.io).[README.OpenHarmony.md](./README.OpenHarmony.md)
 Supports iOS, Android and MacOS.
 
 * Support transactions and batches
@@ -16,3 +16,10 @@ Supports iOS, Android and MacOS.
 * [Documentation](https://github.com/tekartik/sqflite/blob/master/sqflite/README.md)
 * [API reference](https://pub.dartlang.org/documentation/sqflite/latest/sqflite/sqflite-library.html)
 * [How to](https://github.com/tekartik/sqflite/blob/master/sqflite/doc/how_to.md) guide
+
+## OHOS
+
+- [Chinese](README.OpenHarmony_CN.md)
+
+- [English](README.OpenHarmony.md)
+

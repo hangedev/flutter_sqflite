@@ -3,7 +3,7 @@ repository: https://gitcode.com/CPF-Flutter/flutter_sqflite/master/sqflite_ohos
 issue_tracker: https://gitcode.com/CPF-Flutter/flutter_sqflite/issues
 description: Ohos flutter plugin for SQLite, a self-contained, high-reliability,
   embedded, SQL database engine.
-version: 2.4.1
+version: 2.4.2
 
 # This package supports all platforms listed below.
 platforms:
@@ -31,10 +31,8 @@ dependencies:
   flutter:
     sdk: flutter
   path: '>=1.8.0 <4.0.0'
-  sqflite_common:
-    path: ../sqflite_common
-  sqflite_platform_interface:
-    path: ../sqflite_platform_interface
+  sqflite_common: '>=2.5.0-1 <4.0.0'
+  sqflite_platform_interface: ">=2.4.0-0 <4.0.0"
 
 
 dev_dependencies:

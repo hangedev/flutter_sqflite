@@ -14,5 +14,9 @@
 */
 
 export interface OperationRunnable {
+  /**
+   * 执行操作
+   * @returns true 表示执行成功，false 表示执行失败
+   */
   run(): boolean;
 }
