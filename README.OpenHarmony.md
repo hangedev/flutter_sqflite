@@ -20,7 +20,7 @@ dependencies:
   sqflite:
     git:
       url: "https://gitcode.com/CPF-Flutter/flutter_sqflite.git"
-      # ref: 2.4.2-ohos.1.0.0-beta.1
+      # ref: 2.4.2-ohos-1.0.0-beta.2
       ref: TAG   # Please select the TAG to the TAG Version Mapping
       path: sqflite
 ```
@@ -33,12 +33,12 @@ flutter pub get
 
 ### TAG Version Mapping
 
-| Flutter Framework Version | TAG                       | Branch           |
-|---------------------------|---------------------------|------------------|
-| 3.7                       | 2.2.8-ohos-1.0.0-beta.1   | master           |
-| 3.22                      | 2.2.8-ohos-1.0.0-beta.1   | master           |
-| 3.27                      | 2.4.2-ohos.1.0.0-beta.1   | br_v2.4.2_ohos   |
-| 3.35                      | 2.4.2-ohos.1.0.0-beta.1   | br_v2.4.2_ohos   |
+| Flutter Framework Version | TAG                     | Branch           |
+|---------------------------|-------------------------|------------------|
+| 3.7                       | 2.2.8-ohos-1.0.0-beta.1 | master           |
+| 3.22                      | 2.2.8-ohos-1.0.0-beta.1 | master           |
+| 3.27                      | 2.4.2-ohos-1.0.0-beta.2 | br_v2.4.2_ohos   |
+| 3.35                      | 2.4.2-ohos-1.0.0-beta.2 | br_v2.4.2_ohos   |
 
 ## Constraints
 
