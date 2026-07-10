@@ -146,7 +146,8 @@ export async function taskPoolExecuteQuery(context: common.Context, operation: O
     // 条件1: 游标分页查询（需要保持 ResultSet 打开）
     const isCursorQuery = typeof cursorPageSizeRaw === 'number' && cursorPageSizeRaw > 0;
     // 条件2: 在事务中的查询（需要共享同一个 db 连接）
-    const hasTransactionId = !operation.hasNullTransactionId();
+    // 正确判定：Dart 侧仅在事务内才传非 null 的 transactionId（见 database_mixin.dart
+    const hasTransactionId = operation.getTransactionId() != null;
     const inTransaction = hasTransactionId || operation.getInTransactionChange() === true;
     // 条件3: 用户版本查询（特殊处理）
     const isUserVersionQuery = sql == Constant.SQL_PRAGMA_USER_VERSION;
@@ -194,6 +195,17 @@ export async function taskPoolExecuteInsert(context: common.Context, operation: 
 function getStoreConfig(operation: Operation):relationalStore.StoreConfig{
 
   const currentDbId: number | undefined = operation.getArgument(Constant.PARAM_ID) as number;
+
+  // 优先复用打开时缓存的 StoreConfig(含 customDir)，确保读/写落到同一物理文件 (issue #89)
+  const cached: relationalStore.StoreConfig | null =
+    DatabaseHelper.getStoreConfigByDbId(currentDbId!);
+  if (cached != null) {
+    return cached;
+  }
+
+  // 兜底：理论上 openDatabase 总在 query 之前，不应走到这里。
+  // 此时无法还原 customDir，按原逻辑构造(无 customDir)，并打警告便于排查。
+  logger.warn(TAG, `getStoreConfig: no cached config for dbId=${currentDbId}, fallback without customDir`);
   const dbName: string = DatabaseHelper.getMemoryDatabaseNameByDatabaseId(currentDbId);
   const isReadOnly: boolean = DatabaseHelper.dbIdOnlyMap.get(currentDbId) ?? false;
 
