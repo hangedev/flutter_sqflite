@@ -15,6 +15,7 @@ import 'raw_test_page.dart';
 import 'rw_split_test_page.dart';
 import 'slow_test_page.dart';
 import 'src/main_item_widget.dart';
+import 'transaction_repro_page.dart';
 import 'todo_test_page.dart';
 import 'type_test_page.dart';
 
@@ -78,6 +79,9 @@ const String testNewFeaturesRoute = '/test/features';
 /// 读写分叉 bug 复现页 (issue #89)。
 const String testRwSplitRoute = '/test/rwsplit';
 
+/// Transaction repro test page (issue 14800021).
+const String testTransactionReproRoute = '/test/transaction_repro';
+
 class _SqfliteExampleAppState extends State<SqfliteExampleApp> {
   var routes = <String, WidgetBuilder>{
     '/test': (BuildContext context) => MyHomePage(),
@@ -93,6 +97,8 @@ class _SqfliteExampleAppState extends State<SqfliteExampleApp> {
     testDeprecatedRoute: (BuildContext context) => DeprecatedTestPage(),
     testNewFeaturesRoute: (BuildContext context) => NewFeaturesTestPage(),
     testRwSplitRoute: (BuildContext context) => RwSplitTestPage(),
+    testTransactionReproRoute: (BuildContext context) =>
+        const TransactionReproPage(),
   };
 
   @override
@@ -132,6 +138,7 @@ class MyHomePage extends StatefulWidget {
     _items.add(MainItem('Deprecated test', 'Keeping some old tests for deprecated functionalities', route: testDeprecatedRoute));
     _items.add(MainItem('NewFeatures test', 'Testing of all new features', route: testNewFeaturesRoute));
     _items.add(MainItem('R/W split bug (issue #89)', '读写分叉：能写不能读复现', route: testRwSplitRoute));
+    _items.add(MainItem('Transaction Repro (issue 14800021)', 'Reproduce BEGIN TRANSACTION error 14800021 on OHOS', route: testTransactionReproRoute));
 
     // Uncomment to view all logs
     //Sqflite.devSetDebugModeOn(true);
