@@ -12,6 +12,7 @@ import 'model/main_item.dart';
 import 'new_features_test_page.dart';
 import 'open_test_page.dart';
 import 'raw_test_page.dart';
+import 'rw_split_test_page.dart';
 import 'slow_test_page.dart';
 import 'src/main_item_widget.dart';
 import 'todo_test_page.dart';
@@ -74,6 +75,9 @@ const String testDeprecatedRoute = '/test/deprecated';
 /// New features test page.
 const String testNewFeaturesRoute = '/test/features';
 
+/// 读写分叉 bug 复现页 (issue #89)。
+const String testRwSplitRoute = '/test/rwsplit';
+
 class _SqfliteExampleAppState extends State<SqfliteExampleApp> {
   var routes = <String, WidgetBuilder>{
     '/test': (BuildContext context) => MyHomePage(),
@@ -88,6 +92,7 @@ class _SqfliteExampleAppState extends State<SqfliteExampleApp> {
     testExpRoute: (BuildContext context) => ExpTestPage(),
     testDeprecatedRoute: (BuildContext context) => DeprecatedTestPage(),
     testNewFeaturesRoute: (BuildContext context) => NewFeaturesTestPage(),
+    testRwSplitRoute: (BuildContext context) => RwSplitTestPage(),
   };
 
   @override
@@ -126,6 +131,7 @@ class MyHomePage extends StatefulWidget {
     _items.add(MainItem('Manual tests', 'Tests that requires manual execution', route: testManualRoute));
     _items.add(MainItem('Deprecated test', 'Keeping some old tests for deprecated functionalities', route: testDeprecatedRoute));
     _items.add(MainItem('NewFeatures test', 'Testing of all new features', route: testNewFeaturesRoute));
+    _items.add(MainItem('R/W split bug (issue #89)', '读写分叉：能写不能读复现', route: testRwSplitRoute));
 
     // Uncomment to view all logs
     //Sqflite.devSetDebugModeOn(true);
