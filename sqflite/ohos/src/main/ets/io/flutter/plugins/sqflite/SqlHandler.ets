@@ -48,8 +48,13 @@ abstract class BaseSqlHandler implements ISqlHandler {
 export class BeginImmediateHandler extends BaseSqlHandler {
   match(sql: string) {
     const upperSql = sql.toUpperCase();
-    return upperSql === Constant.SQL_BEGIN_IMMEDIATE || 
-           upperSql === Constant.SQL_BEGIN_IMMEDIATE + ' TRANSACTION';
+    return upperSql === Constant.SQL_BEGIN_IMMEDIATE ||
+           upperSql === Constant.SQL_BEGIN_IMMEDIATE + ' TRANSACTION' ||
+           // BEGIN TRANSACTION 在标准 SQLite 中等同 BEGIN DEFERRED TRANSACTION，
+           // 但 OHOS relationalStore 的 beginTransaction() 只有一种事务类型（不区分
+           // DEFERRED/IMMEDIATE/EXCLUSIVE 的锁语义），此处统一走 beginTransaction()，
+           // 对 drift ORM 等下发该命令的场景功能上等价，不影响事务正常开始/提交/回滚。
+           upperSql === 'BEGIN TRANSACTION';
   }
 
   execute(_sql: string, operation: Operation, db: relationalStore.RdbStore): boolean {
@@ -65,7 +70,9 @@ export class BeginImmediateHandler extends BaseSqlHandler {
 /// 提交事务
 export class CommitHandler extends BaseSqlHandler {
   match(sql: string) {
-    return sql.toUpperCase() === Constant.SQL_COMMIT;
+    const upperSql = sql.toUpperCase();
+    return upperSql === Constant.SQL_COMMIT ||
+           upperSql === Constant.SQL_COMMIT + ' TRANSACTION';
   }
 
   execute(sql: string, operation: Operation, db: relationalStore.RdbStore) {
@@ -81,7 +88,9 @@ export class CommitHandler extends BaseSqlHandler {
 // 回滚事务
 export class RollbackHandler extends BaseSqlHandler {
   match(sql: string) {
-    return sql.toUpperCase() === Constant.SQL_ROLLBACK;
+    const upperSql = sql.toUpperCase();
+    return upperSql === Constant.SQL_ROLLBACK ||
+           upperSql === Constant.SQL_ROLLBACK + ' TRANSACTION';
   }
 
   execute(sql: string, operation: Operation, db: relationalStore.RdbStore) {

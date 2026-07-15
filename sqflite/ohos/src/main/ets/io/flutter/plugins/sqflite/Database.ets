@@ -244,7 +244,8 @@ export class Database {
       }
       return true;
     } catch (err) {
-      Log.e('Database', `executeOrError failed for err: ${err}`);
+      const businessErr = err as BusinessError<void>;
+      Log.e(Constant.TAG, `[executeOrError] FAILED sql="${sql}", code=${businessErr.code}, message=${businessErr.message}`);
       await Database.handleException(operation, err, db);
       return false;
     }
@@ -256,6 +257,12 @@ export class Database {
     const inTransactionChangeValue: object = operation.getArgument<object>(Constant.PARAM_IN_TRANSACTION_CHANGE);
     const inTransactionChange: boolean | null = (typeof inTransactionChangeValue === 'boolean') ? inTransactionChangeValue as boolean : null;
     const enteringTransaction: boolean = (inTransactionChange === true) && operation.hasNullTransactionId();
+
+    // 仅对事务控制命令输出诊断日志（inTransactionChange 非空表示是 BEGIN/COMMIT/ROLLBACK 类），
+    // 避免对高频的普通 INSERT/SELECT/UPDATE 每次都打日志，也避免 Release 下泄露业务 SQL。
+    if (inTransactionChange !== null) {
+      Log.i(Constant.TAG, `[execute] sql="${sql}", inTransactionChange=${inTransactionChange}, enteringTransaction=${enteringTransaction}`);
+    }
 
     if (enteringTransaction) {
       Database.currentTransactionId = ++(Database.lastTransactionId);
