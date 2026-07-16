@@ -376,7 +376,7 @@ class _RwSplitTestPageState extends State<RwSplitTestPage> {
           // 顶部按钮区:Wrap 自适应换行,避免小屏溢出
           Container(
             width: double.infinity,
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            color: Theme.of(context).dividerColor.withOpacity(0.12),
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
             child: Wrap(
               alignment: WrapAlignment.center,
