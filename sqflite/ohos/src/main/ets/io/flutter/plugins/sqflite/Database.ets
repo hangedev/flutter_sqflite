@@ -323,8 +323,8 @@ export class Database {
   }
 
   /// insert
-  public static insert(operation: Operation, db: relationalStore.RdbStore): void {
-    Database.doInsert(operation, db);
+  public static async insert(operation: Operation, db: relationalStore.RdbStore): Promise<void> {
+    await Database.doInsert(operation, db);
   }
 
   private static async doInsert(operation: Operation, db: relationalStore.RdbStore): Promise<boolean> {
@@ -355,8 +355,8 @@ export class Database {
   }
 
   /// update
-  public static update(operation: Operation, db: relationalStore.RdbStore): void {
-    Database.doUpdate(operation, db);
+  public static async update(operation: Operation, db: relationalStore.RdbStore): Promise<void> {
+    await Database.doUpdate(operation, db);
   }
 
   private static async doUpdate(operation: Operation, db: relationalStore.RdbStore): Promise<boolean> {
@@ -377,11 +377,14 @@ export class Database {
 
   /// query
   public static async query(operation: Operation, db: relationalStore.RdbStore): Promise<void> {
-    Database.doQuery(operation, db);
+    await Database.doQuery(operation, db);
   }
 
   /// queryCursorNext - 获取游标的下一页数据
-  public static queryCursorNext(operation: Operation): void {
+  // 改为 async：worker 串行队列依赖 queryCursorNext 完成后 captured 才写入，
+  // catch 里的 handleException 是异步的（14800032 分支 await handleConstraintViolation），
+  // 不 await 会在 captured=null 时提前回 null reply -> MissingPluginException。
+  public static async queryCursorNext(operation: Operation): Promise<void> {
     const cursorId: number = operation.getArgument(Constant.PARAM_CURSOR_ID);
     const cancel: boolean = operation.getArgument(Constant.PARAM_CANCEL) ?? false;
     
@@ -416,7 +419,7 @@ export class Database {
       
       operation.success(results);
     } catch (err) {
-      Database.handleException(operation, err as BusinessError<void>);
+      await Database.handleException(operation, err as BusinessError<void>);
       cursorHasMoreData = false;
     } finally {
       // 没有更多数据时关闭游标

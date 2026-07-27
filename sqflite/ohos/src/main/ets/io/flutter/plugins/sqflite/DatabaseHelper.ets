@@ -32,10 +32,6 @@ export class DatabaseHelper {
   public static dbIdMap: HashMap<number, string> = new HashMap<number, string>();
   /// 加载的数据库, 存储数据库id与是否只读
   public static dbIdOnlyMap: HashMap<number, boolean> = new HashMap<number, boolean>();
-  // 加载的数据库, 存储数据库id与打开时使用的 StoreConfig(含 customDir)
-  // 读路径(TaskPool)复用此 config，确保读/写落到同一物理文件
-  public static dbIdConfigMap: Map<number, relationalStore.StoreConfig> =
-    new Map<number, relationalStore.StoreConfig>();
   // 当前数据库的id
   private static currentDbId: number = 0;
   // 内存数据库映射表: 存储内存数据库ID到临时文件名的映射
@@ -80,8 +76,6 @@ export class DatabaseHelper {
         id = DatabaseHelper.currentDbId;
         DatabaseHelper.dbIdMap.set(id, dbName);
         DatabaseHelper.dbIdOnlyMap.set(id, readOnly);
-        // 缓存打开时使用的 StoreConfig（含 customDir），供读路径复用，确保读/写落到同一物理文件
-        DatabaseHelper.dbIdConfigMap.set(id, config);
         // 记录内存数据库的映射关系，用于关闭时清理
         if (isMemoryDb) {
           DatabaseHelper.memoryDbMap.set(id, dbName);
@@ -309,19 +303,11 @@ export class DatabaseHelper {
     return DatabaseHelper.dbIdMap.get(dbid);
   }
 
-  // 取打开时缓存的 StoreConfig(含 customDir)，供读路径复用。
-  // 返回 null 表示该 dbId 未缓存(理论上 openDatabase 总在 query 之前，不会发生)。
-  public static getStoreConfigByDbId(dbid: number): relationalStore.StoreConfig | null {
-    const config = DatabaseHelper.dbIdConfigMap.get(dbid);
-    return config ?? null;
-  }
-
   private static removeDatabaseFromMemoryByDatabaseName(dbName: string) {
     DatabaseHelper.dbMap.delete(dbName);
     let id: number = DatabaseHelper.getMemoryDatabaseIdByDatabaseName(dbName);
     DatabaseHelper.dbIdMap.remove(id);
     DatabaseHelper.dbIdOnlyMap.remove(id);
-    DatabaseHelper.dbIdConfigMap.delete(id);
   }
 
 }
