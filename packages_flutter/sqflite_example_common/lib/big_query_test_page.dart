@@ -14,32 +14,27 @@
  * limitations under the License.
  */
 
-// 大结果集查询验证 -- 复现 issue #75
+// 大结果集查询验证 —— 复现 issue #75
 //
-// 背景：OHOS 上查询返回数据量特别大时，旧实现（主线程 StandardMethodCodec 一次性同步
-// 解码/序列化整个结果集）会因 message 过大导致返回失败或主线程卡死。worker 线程改造后
-// query 走 SendableStandardMethodCodec（worker 线程异步），本页验证大结果集查询能否正常返回。
+// 背景：OHOS 上查询返回数据量特别大时，旧实现（TaskPool 路径）会因 taskPool
+// 序列化限制导致返回失败。修复后 query 搬到自管理 worker 线程
+// （SendableStandardMethodCodec + postMessage），本页验证大结果集查询能否正常返回。
 //
 // 做法：
-//  1) 灌入大量宽行（payload ≈ 1KB），默认 5 万行 ≈ 50MB，放大单次返回体积。
+//  1) 灌入大量宽行（payload ≈ 1KB），默认 10 万行 ≈ 100MB，放大单次返回体积。
 //  2) 对照两种查询：
 //     * 普通一次性 rawQuery('SELECT * FROM Big') —— 把整个结果集一次性拉回。
-//       改造前在此撞序列化/主线程限制报错；改造后应成功。
+//       修复前在此撞序列化限制报错；修复后应成功。
 //     * rawQueryCursor('SELECT * FROM Big', bufferSize: B) —— 分页拉取。
-//       每页体积小，改造前后都应能工作，作为“正确做法”的对照基线。
+//       每页体积小，作为”正确做法”的对照基线。
 //
-// 若设备上普通查询仍报失败，即复现 issue #75，记录错误信息。
-//
-// 移植自 dev 分支（commit 1620ca0）的 big_query_test_page.dart，
-// import 适配 sqflite_example_common 共享包。
+// 若设备上普通查询仍报序列化失败，即复现 issue #75，记录错误信息。
 
-import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:sqflite_common/sqflite.dart';
-
-import 'test_page.dart';
+import 'package:sqflite_example_common/database/database.dart';
 
 /// Big query test route name.
 const String testBigQueryRoute = '/test/bigquery';
@@ -67,8 +62,8 @@ class BigQueryTestPage extends StatefulWidget {
 
 class _BigQueryTestPageState extends State<BigQueryTestPage> {
   // ---- 可配置参数 ----
-  int _total = 50000; // 总行数
-  int _cursorBufferSize = 100; // 游标分页大小
+  int _total = 100000; // 总行数
+  int _cursorBufferSize = 1000; // 游标分页大小
   static const int _bytesPerRow = 1024; // payload 字符串长度（单行约 1KB）
 
   // ---- 运行状态 ----
@@ -82,8 +77,8 @@ class _BigQueryTestPageState extends State<BigQueryTestPage> {
   final _QueryResult _cursor = _QueryResult('游标分页 rawQueryCursor');
 
   // 预设
-  static const List<int> _totalPresets = [10000, 50000, 100000, 200000];
-  static const List<int> _bufferPresets = [100, 1000, 5000];
+  static const List<int> _totalPresets = [100000, 200000];
+  static const List<int> _bufferPresets = [1000, 5000];
 
   static const _tag = '[SQFLITE-BIGQUERY]';
 
@@ -419,8 +414,8 @@ class _BigQueryTestPageState extends State<BigQueryTestPage> {
             Text(text),
             const SizedBox(height: 4),
             const Text(
-              '# 提示：在改造前(主线程)上跑普通查询应失败/卡顿；'
-              '在改造后(worker 线程)上应成功。',
+              '# 提示：在 6c42dd2^(修改前,taskPool) 上跑普通查询应失败；'
+              '在 6c42dd2(修改后,worker) 上应成功。',
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
           ],
