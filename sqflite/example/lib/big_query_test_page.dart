@@ -17,20 +17,20 @@
 // 大结果集查询验证 -- 复现 issue #75
 //
 // 背景：OHOS 上查询返回数据量特别大时，旧实现（TaskPool 路径，已在提交 6c42dd2 删除）
-// 会因 taskPool 序列化限制导致返回失败。提交 6c42dd2 把 query 搬到自管理 worker
-// 线程（SendableStandardMethodCodec + postMessage），本页验证大结果集查询能否正常返回。
+// 会因 taskPool 序列化限制（16MB）导致返回失败。提交 6c42dd2 把 query 搬到自管理
+// worker 线程（ArrayBuffer transfer + postMessage），绕过序列化限制，本页验证大
+// 结果集查询能否正常返回。
 //
 // 做法：
-//  1) 灌入大量宽行（payload ≈ 1KB），默认 5 万行 ≈ 50MB，放大单次返回体积。
+//  1) 灌入大量宽行（payload ≈ 1KB），默认 10 万行 ≈ 100MB，放大单次返回体积。
 //  2) 对照两种查询：
 //     * 普通一次性 rawQuery('SELECT * FROM Big') —— 把整个结果集一次性拉回。
 //       修改前在此撞序列化限制报错；修改后应成功。
 //     * rawQueryCursor('SELECT * FROM Big', bufferSize: B) —— 分页拉取。
-//       每页体积小，修改前后都应能工作，作为“正确做法”的对照基线。
+//       每页体积小，修改前后都应能工作，作为”正确做法”的对照基线。
 //
 // 若设备上普通查询仍报序列化失败，即复现 issue #75，记录错误信息。
 
-import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -63,8 +63,8 @@ class BigQueryTestPage extends StatefulWidget {
 
 class _BigQueryTestPageState extends State<BigQueryTestPage> {
   // ---- 可配置参数 ----
-  int _total = 50000; // 总行数
-  int _cursorBufferSize = 100; // 游标分页大小
+  int _total = 100000; // 总行数
+  int _cursorBufferSize = 1000; // 游标分页大小
   static const int _bytesPerRow = 1024; // payload 字符串长度（单行约 1KB）
 
   // ---- 运行状态 ----
@@ -78,8 +78,8 @@ class _BigQueryTestPageState extends State<BigQueryTestPage> {
   final _QueryResult _cursor = _QueryResult('游标分页 rawQueryCursor');
 
   // 预设
-  static const List<int> _totalPresets = [10000, 50000, 100000, 200000];
-  static const List<int> _bufferPresets = [100, 1000, 5000];
+  static const List<int> _totalPresets = [100000, 200000];
+  static const List<int> _bufferPresets = [1000, 5000];
 
   static const _tag = '[SQFLITE-BIGQUERY]';
 
@@ -263,7 +263,7 @@ class _BigQueryTestPageState extends State<BigQueryTestPage> {
                   onPressed: _running ? null : _run,
                   child: Text(_running
                       ? '${_phase ?? '运行中'}…'
-                      : '灌入 $_formatCount(_total) 行并查询'),
+                      : '灌入 ${_formatCount(_total)} 行并查询'),
                 ),
               ),
             ],
@@ -415,8 +415,8 @@ class _BigQueryTestPageState extends State<BigQueryTestPage> {
             Text(text),
             const SizedBox(height: 4),
             const Text(
-              '# 提示：在 6c42dd2^(修改前,taskPool) 上跑普通查询应失败；'
-              '在 6c42dd2(修改后,worker) 上应成功。',
+              '# 提示：在 6c42dd2 之前的版本（TaskPool 路径）上跑普通查询应失败；'
+              '在 6c42dd2 及之后（worker 线程路径）上应成功。',
               style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
           ],
