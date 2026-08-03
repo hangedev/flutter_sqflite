@@ -31,7 +31,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
-import 'package:sqflite_example/database/database.dart';
 
 /// Stress test route name.
 const String testStressRoute = '/test/stress';
@@ -67,6 +66,13 @@ class _StressTestPageState extends State<StressTestPage> {
   Stopwatch? _sw;
   String? _errorText;
 
+  // 并发安全：每次点击生成独立库文件，避免“开始插入 + 返回上一页 + 再开始”
+  // 时多轮 _run() 共享同一个 stress_test.db（默认 singleInstance 会在 native
+  // 复用同一 RdbStore），导致 deleteDatabase / openDatabase / CREATE TABLE 互相竞争。
+  int _runSeq = 0;
+  Database? _db;
+  bool _disposed = false;
+
   // 预设行数快捷按钮
   static const List<int> _totalPresets = [500000, 1000000];
 
@@ -78,6 +84,19 @@ class _StressTestPageState extends State<StressTestPage> {
     print('$_tag $msg');
   }
 
+  @override
+  void dispose() {
+    _disposed = true;
+    // 页面被弹出时立即关库，终止仍在后台的插入，避免与下一次点击的
+    // _run() 同时操作同一个库文件。
+    final db = _db;
+    _db = null;
+    if (db != null) {
+      db.close().catchError((_) {});
+    }
+    super.dispose();
+  }
+
   // ---- 执行插入 ----
   Future<void> _run() async {
     setState(() {
@@ -87,23 +106,26 @@ class _StressTestPageState extends State<StressTestPage> {
     });
     _sw = Stopwatch()..start();
 
-    _log('START total=$_total strategy=${_strategy.name} txn=$_useTransaction');
+    // 每次运行使用独立库文件，天然隔离多轮并发，无需再 initDeleteDb。
+    final path = 'stress_test_${DateTime.now().microsecondsSinceEpoch}_$_runSeq.db';
+    _runSeq++;
+    _log('START total=$_total strategy=${_strategy.name} txn=$_useTransaction path=$path');
 
+    Database? db;
     try {
-      final path = await initDeleteDb('stress_test.db');
-      final db = await openDatabase(path);
+      db = await openDatabase(path);
+      _db = db;
+      if (_disposed) return;
+
       await db.execute(
         'CREATE TABLE Test (id INTEGER PRIMARY KEY, name TEXT, value INTEGER)',
       );
+      if (_disposed) return;
 
-      try {
-        if (_strategy == StressStrategy.chunked) {
-          await _runChunkedCommit(db);
-        } else {
-          await _runSingleCommit(db);
-        }
-      } finally {
-        await db.close();
+      if (_strategy == StressStrategy.chunked) {
+        await _runChunkedCommit(db);
+      } else {
+        await _runSingleCommit(db);
       }
 
       _sw!.stop();
@@ -114,10 +136,34 @@ class _StressTestPageState extends State<StressTestPage> {
       }
     } catch (e, st) {
       _sw?.stop();
-      _log('CRASH/ERROR inserted=$_inserted elapsedMs=${_sw?.elapsedMilliseconds} : $e');
-      _errorText = '$e\n$st';
-      if (mounted) {
-        setState(() => _running = false);
+      if (_disposed) {
+        // 返回上一页导致的后台插入中断，不是被测插件的崩溃。
+        _log('CANCELLED (page disposed) inserted=$_inserted '
+            'elapsedMs=${_sw?.elapsedMilliseconds} : $e');
+      } else {
+        _log('CRASH/ERROR inserted=$_inserted '
+            'elapsedMs=${_sw?.elapsedMilliseconds} : $e');
+        if (mounted) {
+          setState(() {
+            _errorText = '$e\n$st';
+            _running = false;
+          });
+        }
+      }
+    } finally {
+      _db = null;
+      // 统一关库（dispose 已关则忽略异常），再清理本次库文件。
+      if (db != null) {
+        try {
+          await db.close();
+        } catch (_) {
+          // ignore: dispose 已关闭或已损坏
+        }
+      }
+      try {
+        await deleteDatabase(path);
+      } catch (_) {
+        // 清理失败（如文件仍被占用）不影响测试结论。
       }
     }
   }

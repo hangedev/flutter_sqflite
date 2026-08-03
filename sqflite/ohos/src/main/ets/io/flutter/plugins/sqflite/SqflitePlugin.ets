@@ -97,8 +97,10 @@ export default class SqflitePlugin implements FlutterPlugin {
         // context 随每条 message 透传进 worker（PR#25 同作者验证的 args 模式，
         // 避免 @Sendable 字段约束）。
         try {
+          // 拷贝后转发：engine 在 onMessage 返回后可能复用该 message 的 ArrayBuffer。
+          const messageCopy = message.slice(0);
           this.sqfliteWorker!.postMessageWithSharedSendable(
-            { seq: id, message: message, context: this.context }, [message]);
+            { seq: id, message: messageCopy, context: this.context }, [messageCopy]);
         } catch (e) {
           // worker 在 null 检查后被终止 / 序列化失败：回滚 pending 并回 null，保证 Dart 不挂。
           Log.e('SqflitePlugin', 'postMessage to worker failed, replying null: ' + e);
