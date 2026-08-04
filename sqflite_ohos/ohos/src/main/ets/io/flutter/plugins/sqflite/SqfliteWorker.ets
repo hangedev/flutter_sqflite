@@ -31,7 +31,8 @@
 import { MessageEvents, ThreadWorkerGlobalScope, worker } from '@kit.ArkTS';
 import common from '@ohos.app.ability.common';
 import relationalStore from '@ohos.data.relationalStore';
-import SendableStandardMethodCodec from '@ohos/flutter_ohos/src/main/ets/plugin/common/SendableStandardMethodCodec';
+// 用非 Sendable 的 StandardMethodCodec，而非 SendableStandardMethodCodec：
+import StandardMethodCodec from '@ohos/flutter_ohos/src/main/ets/plugin/common/StandardMethodCodec';
 import StringUtils from '@ohos/flutter_ohos/src/main/ets/util/StringUtils';
 import Log from '@ohos/flutter_ohos/src/main/ets/util/Log';
 import MethodCall from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodCall';
@@ -43,7 +44,8 @@ import { MethodCallOperation } from './operation/MethodCallOperation';
 import { Constant } from './Constant';
 
 const workerPort: ThreadWorkerGlobalScope = worker.workerPort;
-const codec = SendableStandardMethodCodec.INSTANCE;
+// worker 本地实例（非 Sendable 类每个 worker 各自模块静态），不与主线程共享。
+const codec = StandardMethodCodec.INSTANCE;
 
 interface SqfliteTask {
   seq: number;
@@ -102,6 +104,7 @@ async function handleOne(seq: number, message: ArrayBuffer, context: common.Cont
   } catch (err) {
     // 兜底：保证每条 message 一定有回执（哪怕是 error），
     // 否则主线程 pending 永久残留该 seq。
+    Log.e('SqfliteWorker', `handleOne error seq=${seq}: ${err}`);
     result = codec.encodeErrorEnvelope('error', String(err), null);
     try {
       workerPort.postMessage({ seq: seq, result: result }, [result]);
