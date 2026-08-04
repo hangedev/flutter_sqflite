@@ -25,7 +25,8 @@
 import { MessageEvents, ThreadWorkerGlobalScope, worker } from '@kit.ArkTS';
 import common from '@ohos.app.ability.common';
 import relationalStore from '@ohos.data.relationalStore';
-import SendableStandardMethodCodec from '@ohos/flutter_ohos/src/main/ets/plugin/common/SendableStandardMethodCodec';
+// 用非 Sendable 的 StandardMethodCodec，而非 SendableStandardMethodCodec：
+import StandardMethodCodec from '@ohos/flutter_ohos/src/main/ets/plugin/common/StandardMethodCodec';
 import StringUtils from '@ohos/flutter_ohos/src/main/ets/util/StringUtils';
 import Log from '@ohos/flutter_ohos/src/main/ets/util/Log';
 import MethodCall from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodCall';
@@ -37,7 +38,8 @@ import { MethodCallOperation } from './operation/MethodCallOperation';
 import { Constant } from './OhosConstant';
 
 const workerPort: ThreadWorkerGlobalScope = worker.workerPort;
-const codec = SendableStandardMethodCodec.INSTANCE;
+// worker 本地实例（非 Sendable 类每个 worker 各自模块静态），不与主线程共享。
+const codec = StandardMethodCodec.INSTANCE;
 
 interface SqfliteTask {
   seq: number;

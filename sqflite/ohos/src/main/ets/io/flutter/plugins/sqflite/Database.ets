@@ -112,16 +112,37 @@ export class Database {
    */
   private static handleTableOrSyntaxError(operation: Operation, message: string): void {
     let normalizedMessage = message;
-    
-    // 判断表不存在：Insert failed | updated data does not exist | does not exist
-    if (message.includes('Insert failed') || message.includes('updated data does not') || message.includes('does not exist')) {
+    const sql = operation.getSqlCommand()?.getSql() || '';
+    // CREATE TABLE 命中 14800021 时只可能是“表已存在”或保留字语法错误，不可能是 no such table，
+    // 用于在 message 不含 “already exists” 字样时兜底。
+    const createTableMatch = sql.match(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)/i);
+
+    // 表已存在（如 CREATE TABLE 重复建表）：OHOS 的通用文案
+    // “Generic error...the updated data does not exist...table X already exists”
+    // 同样包含 “does not exist” 字样，必须先于“表不存在”分支判定，避免误报。
+    if (message.toLowerCase().includes('already exists')) {
+      normalizedMessage = createTableMatch != null
+        ? `table ${createTableMatch[1]} already exists`
+        : `table already exists`;
+    } else if (createTableMatch != null &&
+      (message.includes('does not exist') || message.includes('Generic error'))) {
+      // 部分设备实测 OHOS 抛出的 BusinessError.message 只含通用文案
+      // “SQLite: Generic error...updated data does not exist.”，不含 “already exists” 字样，
+      // 因此按 CREATE TABLE 语句类型兜底；保留字表名仍判为语法错误。
+      const tableName = createTableMatch[1];
+      const isReserved =
+        Constant.SQL_RESERVED_WORDS.some(kw => tableName.toLowerCase() === kw.toLowerCase());
+      normalizedMessage = isReserved ? `syntax error` : `table ${tableName} already exists`;
+    } else if (message.includes('Insert failed') || message.includes('updated data does not') ||
+      message.includes('does not exist')) {
+      // 判断表不存在：Insert failed | updated data does not exist | does not exist
       normalizedMessage = Database.normalizeTableNotFoundError(operation, message);
-    } else if (message.includes('not supported') || 
-             (message.includes('Generic error') && !message.includes('Insert failed'))) {
+    } else if (message.includes('not supported') ||
+      (message.includes('Generic error') && !message.includes('Insert failed'))) {
       // 判断语法错误：not supported 或 纯粹的 Generic error（不包含 Insert failed）
       normalizedMessage = `syntax error`;
     }
-    
+
     operation.error(Constant.SQLITE_ERROR, normalizedMessage, SqlErrorInfo.getMap(operation));
   }
 
@@ -216,6 +237,14 @@ export class Database {
     let sql: string = command.getSql();
     let promise: ValueType | undefined;
     try {
+      // 防御：并发下解码偶发损坏导致 sql 字段缺失时，返回明确错误，避免 isDDL 里
+      // undefined.trim() 抛 TypeError 误导（曾误报为 “Cannot read property trim of undefined”）。
+      if (!sql) {
+        Log.e(Constant.TAG, '[executeOrError] FAILED: sql is undefined (message decode corrupted)');
+        operation.error(Constant.SQLITE_ERROR, 'invalid sql argument: missing sql field',
+          SqlErrorInfo.getMap(operation));
+        return false;
+      }
       // DDL 语句(CREATE/DROP/ALTER)需要使用 executeSql
       const isDDL = Database.isDDL(sql);
       
@@ -245,7 +274,10 @@ export class Database {
       return true;
     } catch (err) {
       const businessErr = err as BusinessError<void>;
-      Log.e(Constant.TAG, `[executeOrError] FAILED sql="${sql}", code=${businessErr.code}, message=${businessErr.message}`);
+      // 诊断：打印失败 SQL 与参数，便于定位 401（Parameter error）/ 14800021 等错误的具体操作。
+      // 并发压力下若 sqlArguments 出现 undefined 元素，RDB 会报 "The X must be ValueObject"。
+      Log.e(Constant.TAG, `[executeOrError] FAILED sql="${sql}", code=${businessErr.code}, ` +
+        `message=${businessErr.message}, argsLen=${sqlArguments?.length}, args0=${sqlArguments?.[0]}`);
       await Database.handleException(operation, err, db);
       return false;
     }
