@@ -1,3 +1,7 @@
+## 2.2.8-ohos-1.0.0
+
+* Publish the official release
+
 ## 2.2.8-ohos-1.0.0-beta.2
 
 ### Added
