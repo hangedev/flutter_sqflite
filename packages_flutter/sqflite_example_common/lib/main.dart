@@ -13,12 +13,15 @@ import 'package:sqflite_example_common/open_database_behavior_test_page.dart';
 import 'package:sqflite_example_common/open_error_verify_page.dart';
 import 'package:sqflite_example_common/src/dev_utils.dart';
 
+import 'bench_test_page.dart';
+import 'big_query_test_page.dart';
 import 'io_test_page.dart';
 import 'model/main_item.dart';
 import 'open_test_page.dart';
 import 'raw_test_page.dart';
 import 'slow_test_page.dart';
 import 'src/main_item_widget.dart';
+import 'stress_test_page.dart';
 import 'todo_test_page.dart';
 import 'type_test_page.dart';
 export 'utils.dart' show supportsCompatMode;
@@ -87,6 +90,15 @@ const String testOpenErrorVerifyRoute = '/test/open_error_verify';
 /// Debug info test page.
 const String testDebugInfoRoute = '/test/debug_info';
 
+/// Stress test page (大数据插入压力测试, issue #45/#65).
+const String testStressRoute = '/test/stress';
+
+/// Bench test page (单次操作耗时基准, 验证 worker 线程改造).
+const String testBenchRoute = '/test/bench';
+
+/// Big query test page (issue #75 大结果集查询).
+const String testBigQueryRoute = '/test/bigquery';
+
 /// Extra routes added by the application.
 Map<String, WidgetBuilder>? extraRoutes;
 
@@ -112,6 +124,9 @@ class _SqfliteExampleAppState extends State<SqfliteExampleApp> {
         const OhosOpenErrorVerifyPage(),
     testDebugInfoRoute: (BuildContext context) =>
         const DebugInfoTestPage(),
+    testStressRoute: (BuildContext context) => const StressTestPage(),
+    testBenchRoute: (BuildContext context) => const BenchTestPage(),
+    testBigQueryRoute: (BuildContext context) => const BigQueryTestPage(),
   }..addAll(extraRoutes ?? {});
 
   @override
@@ -223,6 +238,27 @@ class MyHomePage extends StatefulWidget {
         'Debug 信息验证测试',
         '验证 debug 返回完整路径、singleInstance、logLevel',
         route: testDebugInfoRoute,
+      ),
+    );
+    _items.add(
+      MainItem(
+        '大数据插入压力测试',
+        '大数据插入 GC/掉帧/崩溃复现 (issue #45/#65)',
+        route: testStressRoute,
+      ),
+    );
+    _items.add(
+      MainItem(
+        '单次操作耗时基准',
+        '建表/插入/修改/查询单次端到端耗时统计 (验证 worker 线程改造)',
+        route: testBenchRoute,
+      ),
+    );
+    _items.add(
+      MainItem(
+        '大结果集查询 (#75)',
+        '大数据量查询序列化失败复现 + 游标分页对照',
+        route: testBigQueryRoute,
       ),
     );
     if (extraRoutes != null) {

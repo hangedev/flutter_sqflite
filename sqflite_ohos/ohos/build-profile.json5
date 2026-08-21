@@ -7,6 +7,11 @@
 {
   "apiType": "stageMode",
   "buildOption": {
+    "sourceOption": {
+      "workers": [
+        "./src/main/ets/io/flutter/plugins/sqflite/SqfliteWorker.ets"
+      ]
+    }
   },
   "targets": [
     {

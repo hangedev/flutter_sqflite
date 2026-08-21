@@ -100,10 +100,30 @@ export class Database {
    */
   private static handleTableOrSyntaxError(operation: Operation, message: string): void {
     let normalizedMessage = message;
+    const sql = operation.getSqlCommand()?.getSql() || '';
+    // CREATE TABLE 命中 14800021 时只可能是“表已存在”或保留字语法错误，不可能是 no such table，
+    // 用于在 message 不含 “already exists” 字样时兜底。
+    const createTableMatch = sql.match(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)/i);
 
-    // 判断表不存在：Insert failed | updated data does not exist | does not exist
-    if (message.includes('Insert failed') || message.includes('updated data does not') ||
-    message.includes('does not exist')) {
+    // 表已存在（如 CREATE TABLE 重复建表）：OHOS 的通用文案
+    // “Generic error...the updated data does not exist...table X already exists”
+    // 同样包含 “does not exist” 字样，必须先于“表不存在”分支判定，避免误报。
+    if (message.toLowerCase().includes('already exists')) {
+      normalizedMessage = createTableMatch != null
+        ? `table ${createTableMatch[1]} already exists`
+        : `table already exists`;
+    } else if (createTableMatch != null &&
+      (message.includes('does not exist') || message.includes('Generic error'))) {
+      // 部分设备实测 OHOS 抛出的 BusinessError.message 只含通用文案
+      // “SQLite: Generic error...updated data does not exist.”，不含 “already exists” 字样，
+      // 因此按 CREATE TABLE 语句类型兜底；保留字表名仍判为语法错误。
+      const tableName = createTableMatch[1];
+      const isReserved =
+        Constant.SQL_RESERVED_WORDS.some(kw => tableName.toLowerCase() === kw.toLowerCase());
+      normalizedMessage = isReserved ? `syntax error` : `table ${tableName} already exists`;
+    } else if (message.includes('Insert failed') || message.includes('updated data does not') ||
+      message.includes('does not exist')) {
+      // 判断表不存在：Insert failed | updated data does not exist | does not exist
       normalizedMessage = Database.normalizeTableNotFoundError(operation, message);
     } else if (message.includes('not supported') ||
       (message.includes('Generic error') && !message.includes('Insert failed'))) {
@@ -206,6 +226,14 @@ export class Database {
     let sql: string = command.getSql();
     let promise: ValueType | undefined;
     try {
+      // 防御：并发下解码偶发损坏导致 sql 字段缺失时，返回明确错误，避免 isDDL 里
+      // undefined.trim() 抛 TypeError 误导（曾误报为 “Cannot read property trim of undefined”）。
+      if (!sql) {
+        Log.e('Database', '[executeOrError] FAILED: sql is undefined (message decode corrupted)');
+        operation.error(Constant.SQLITE_ERROR, 'invalid sql argument: missing sql field',
+          SqlErrorInfo.getMap(operation));
+        return false;
+      }
       // DDL 语句(CREATE/DROP/ALTER)需要使用 executeSql
       const isDDL = Database.isDDL(sql);
 
@@ -239,7 +267,11 @@ export class Database {
       }
       return true;
     } catch (err) {
-      Log.e('Database', `executeOrError failed for err: ${err}`);
+      const businessErr = err as BusinessError<void>;
+      // 诊断：打印失败 SQL 与参数，便于定位 401（Parameter error）/ 14800021 等错误的具体操作。
+      // 并发压力下若 sqlArguments 出现 undefined 元素，RDB 会报 "The X must be ValueObject"。
+      Log.e('Database', `[executeOrError] FAILED sql="${sql}", code=${businessErr.code}, ` +
+        `message=${businessErr.message}, argsLen=${sqlArguments?.length}, args0=${sqlArguments?.[0]}`);
       await Database.handleException(operation, err, db);
       return false;
     }
@@ -328,8 +360,8 @@ export class Database {
    * @param operation 操作对象
    * @param db 数据库实例
    */
-  public static insert(operation: Operation, db: relationalStore.RdbStore): void {
-    Database.doInsert(operation, db);
+  public static async insert(operation: Operation, db: relationalStore.RdbStore): Promise<void> {
+    await Database.doInsert(operation, db);
   }
 
   private static async doInsert(operation: Operation, db: relationalStore.RdbStore): Promise<boolean> {
@@ -364,8 +396,8 @@ export class Database {
    * @param operation 操作对象
    * @param db 数据库实例
    */
-  public static update(operation: Operation, db: relationalStore.RdbStore): void {
-    Database.doUpdate(operation, db);
+  public static async update(operation: Operation, db: relationalStore.RdbStore): Promise<void> {
+    await Database.doUpdate(operation, db);
   }
 
   private static async doUpdate(operation: Operation, db: relationalStore.RdbStore): Promise<boolean> {
@@ -390,14 +422,17 @@ export class Database {
    * @param db 数据库实例
    */
   public static async query(operation: Operation, db: relationalStore.RdbStore): Promise<void> {
-    Database.doQuery(operation, db);
+    await Database.doQuery(operation, db);
   }
 
   /**
    * queryCursorNext - 获取游标的下一页数据
    * @param operation 操作对象
   */
-  public static queryCursorNext(operation: Operation): void {
+  // 改为 async：worker 串行队列依赖 queryCursorNext 完成后 captured 才写入，
+  // catch 里的 handleException 是异步的（14800032 分支 await handleConstraintViolation），
+  // 不 await 会在 captured=null 时提前回 null reply -> MissingPluginException。
+  public static async queryCursorNext(operation: Operation): Promise<void> {
     const cursorId: number = operation.getArgument(Constant.PARAM_CURSOR_ID);
     const cancel: boolean = operation.getArgument(Constant.PARAM_CANCEL) ?? false;
 
@@ -432,7 +467,7 @@ export class Database {
 
       operation.success(results);
     } catch (err) {
-      Database.handleException(operation, err as BusinessError<void>);
+      await Database.handleException(operation, err as BusinessError<void>);
       cursorHasMoreData = false;
     } finally {
       // 没有更多数据时关闭游标
