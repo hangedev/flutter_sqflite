@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'bench_test_page.dart';
+import 'big_query_test_page.dart';
 import 'package:sqflite_example/batch_test_page.dart';
 import 'package:sqflite_example/deprecated_test_page.dart';
 import 'package:sqflite_example/exception_test_page.dart';
@@ -12,8 +14,11 @@ import 'model/main_item.dart';
 import 'new_features_test_page.dart';
 import 'open_test_page.dart';
 import 'raw_test_page.dart';
+import 'rw_split_test_page.dart';
 import 'slow_test_page.dart';
+import 'stress_test_page.dart';
 import 'src/main_item_widget.dart';
+import 'transaction_repro_page.dart';
 import 'todo_test_page.dart';
 import 'type_test_page.dart';
 
@@ -74,6 +79,21 @@ const String testDeprecatedRoute = '/test/deprecated';
 /// New features test page.
 const String testNewFeaturesRoute = '/test/features';
 
+/// 读写分叉 bug 复现页 (issue #89)。
+const String testRwSplitRoute = '/test/rwsplit';
+
+/// Stress test page (大数据插入压力测试).
+const String testStressRoute = '/test/stress';
+
+/// Bench test page (单次操作耗时基准, 验证 6c42dd2).
+const String testBenchRoute = '/test/bench';
+
+/// Big query test page (issue #75 大结果集查询).
+const String testBigQueryRoute = '/test/bigquery';
+
+/// Transaction repro test page (issue 14800021).
+const String testTransactionReproRoute = '/test/transaction_repro';
+
 class _SqfliteExampleAppState extends State<SqfliteExampleApp> {
   var routes = <String, WidgetBuilder>{
     '/test': (BuildContext context) => MyHomePage(),
@@ -88,6 +108,12 @@ class _SqfliteExampleAppState extends State<SqfliteExampleApp> {
     testExpRoute: (BuildContext context) => ExpTestPage(),
     testDeprecatedRoute: (BuildContext context) => DeprecatedTestPage(),
     testNewFeaturesRoute: (BuildContext context) => NewFeaturesTestPage(),
+    testRwSplitRoute: (BuildContext context) => RwSplitTestPage(),
+    testStressRoute: (BuildContext context) => const StressTestPage(),
+    testBenchRoute: (BuildContext context) => const BenchTestPage(),
+    testBigQueryRoute: (BuildContext context) => const BigQueryTestPage(),
+    testTransactionReproRoute: (BuildContext context) =>
+        const TransactionReproPage(),
   };
 
   @override
@@ -126,6 +152,11 @@ class MyHomePage extends StatefulWidget {
     _items.add(MainItem('Manual tests', 'Tests that requires manual execution', route: testManualRoute));
     _items.add(MainItem('Deprecated test', 'Keeping some old tests for deprecated functionalities', route: testDeprecatedRoute));
     _items.add(MainItem('NewFeatures test', 'Testing of all new features', route: testNewFeaturesRoute));
+    _items.add(MainItem('R/W split bug (issue #89)', '读写分叉：能写不能读复现', route: testRwSplitRoute));
+    _items.add(MainItem('大数据插入压力测试', '大数据插入 GC/掉帧/崩溃复现 (issue #65)', route: testStressRoute));
+    _items.add(MainItem('单次操作耗时基准', '建表/插入/修改/查询单次端到端耗时统计 (验证 6c42dd2)', route: testBenchRoute));
+    _items.add(MainItem('大结果集查询 (#75)', '大数据量查询序列化失败复现 + 游标分页对照', route: testBigQueryRoute));
+    _items.add(MainItem('Transaction Repro (issue 14800021)', 'Reproduce BEGIN TRANSACTION error 14800021 on OHOS', route: testTransactionReproRoute));
 
     // Uncomment to view all logs
     //Sqflite.devSetDebugModeOn(true);
