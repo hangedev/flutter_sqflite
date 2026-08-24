@@ -849,6 +849,33 @@ CREATE TABLE test (
       }
     });
 
+    test('VACUUM', () async {
+      // Android/iOS/FFI 原生 SQLite 支持 VACUUM，正常执行；OHOS RDB 引擎可能
+      // 拒绝 VACUUM（插件会尝试 executeSql，仍拒绝则报明确 not supported），
+      // 但无论哪种情况都绝不能误报 syntax error。
+      final path = await initDeleteDb('exp_vacuum.db');
+      final db = await openDatabase(path);
+      try {
+        await db.execute('CREATE TABLE test (id INTEGER)');
+        await db.insert('test', <String, Object?>{'id': 1});
+
+        try {
+          await db.execute('VACUUM');
+        } on DatabaseException catch (e) {
+          expect(e.isSyntaxError(), isFalse,
+              reason: 'VACUUM 不应误报 syntax error，实际: $e');
+          expect(e.toString(), contains('VACUUM is not supported'),
+              reason: '应返回明确的 not supported 错误，实际: $e');
+        }
+
+        // 数据完好
+        final count = firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM test'));
+        expect(count, 1);
+      } finally {
+        await db.close();
+      }
+    });
+
     Future<bool> supports(String exec) async {
       final db = await databaseFactory.openDatabase(inMemoryDatabasePath);
       print('supports: $exec');

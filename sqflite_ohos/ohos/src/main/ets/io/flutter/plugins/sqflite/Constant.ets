@@ -97,6 +97,9 @@ export class Constant {
   static SQL_ATTACH: string = "ATTACH";
   static SQL_DETACH: string = "DETACH";
   static SQL_PRAGMA_USER_VERSION: string = "PRAGMA user_version";
+  static SQL_VACUUM: string = "VACUUM";
+  // OHOS RDB 引擎不支持 VACUUM 语句，返回该明确错误而非误导性的 syntax error
+  static MSG_VACUUM_NOT_SUPPORTED: string = "VACUUM is not supported on this platform (OpenHarmony RDB)";
   static API_17: number = 17;
   static API_20: number = 20;
   static DB_PATH_PARSING_BEGIN_INDEX: number = 6;
