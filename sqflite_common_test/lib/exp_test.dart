@@ -541,4 +541,30 @@ INSERT INTO test (value) VALUES (10);
       await db.close();
     }
   });
+  test('VACUUM', () async {
+    // Android/iOS/FFI 原生 SQLite 支持 VACUUM，直接成功；
+    // OHOS RDB 引擎不支持 VACUUM，但插件必须返回明确的 "not supported" 错误，
+    // 绝不能落入通用错误映射而误报 syntax error。
+    var path = await context.initDeleteDb('exp_vacuum.db');
+    var db = await factory.openDatabase(path);
+    try {
+      await db.execute('CREATE TABLE test (id INTEGER)');
+      await db.insert('test', <String, Object?>{'id': 1});
+
+      try {
+        await db.execute('VACUUM');
+      } on DatabaseException catch (e) {
+        verify(!e.isSyntaxError(), 'VACUUM 不应误报 syntax error: $e');
+        verify(e.toString().contains('VACUUM is not supported'),
+            '应返回明确的 not supported 错误: $e');
+      }
+
+      // 数据完好
+      var count =
+          utils.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM test'));
+      expect(count, 1);
+    } finally {
+      await db.close();
+    }
+  });
 }

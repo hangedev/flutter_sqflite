@@ -33,7 +33,11 @@ import {
   CommitHandler,
   DetachHandler,
   ISqlHandler,
-  RollbackHandler
+  RollbackHandler,
+  VacuumHandler,
+  isVacuumStatement,
+  reportVacuumNotSupported,
+  tryVacuumOrReportNotSupported
 } from './SqlHandler';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { DatabaseHelper } from './DatabaseHelper';
@@ -69,7 +73,8 @@ export class Database {
     new RollbackHandler(),
     new BeginExclusiveHandler(),
     new AttachHandler(),
-    new DetachHandler()
+    new DetachHandler(),
+    new VacuumHandler()
   ];
 
   private static async handleException(operation: Operation, err: BusinessError<void>,
@@ -233,6 +238,12 @@ export class Database {
         operation.error(Constant.SQLITE_ERROR, 'invalid sql argument: missing sql field',
           SqlErrorInfo.getMap(operation));
         return false;
+      }
+      // VACUUM：非 DDL，走 execute() 会被 OHOS RDB 拒绝（曾误报 syntax error）；
+      // 先尝试 executeSql 真正执行，引擎拒绝再返回明确错误。
+      // 单条 execute 已被 handler 链拦截，此处兜底 batch 等不经过 handler 链的路径。
+      if (isVacuumStatement(sql)) {
+        return await tryVacuumOrReportNotSupported(sql, operation, db);
       }
       // DDL 语句(CREATE/DROP/ALTER)需要使用 executeSql
       const isDDL = Database.isDDL(sql);
@@ -609,6 +620,12 @@ export class Database {
   private static async doQuery(operation: Operation, db: relationalStore.RdbStore): Promise<boolean> {
     let command: SqlCommand = operation.getSqlCommand();
     let sql: string = command.getSql();
+
+    // VACUUM 非查询语句，querySql 无法返回结果集且会落入空结果集 → 误报 syntax error。
+    // rawQuery 路径不尝试执行，直接返回明确的 not supported。
+    if (isVacuumStatement(sql)) {
+      return reportVacuumNotSupported(operation);
+    }
 
     // 特殊处理：用户版本查询
     if (sql == Constant.SQL_PRAGMA_USER_VERSION) {

@@ -18,6 +18,7 @@ import { relationalStore } from '@kit.ArkData';
 import { Tools } from './Tools';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { Constant } from './Constant';
+import { SqlErrorInfo } from './operation/SqlErrorInfo';
 
 /**
  * 每个 Handler 都要实现 match + execute
@@ -210,5 +211,66 @@ export class DetachHandler extends BaseSqlHandler {
       operation.error(Constant.SQLITE_ERROR, `detach failed, error code: ${error.code}. message is ${error.message}`, '');
       return false;
     }
+  }
+}
+
+/// VACUUM：OHOS RDB 引擎不支持，直接返回明确错误，避免落入通用 14800021 映射而误报 syntax error。
+/// 命中即拦截，Dart 侧收到 "VACUUM is not supported on this platform (OpenHarmony RDB)"。
+export function isVacuumStatement(sql: string): boolean {
+  if (!sql) {
+    return false;
+  }
+  return Tools.startsWithIgnoreCase(sql.trim(), Constant.SQL_VACUUM);
+}
+
+/**
+ * 报告 VACUUM 不支持错误
+ * @param operation 操作对象
+ * @returns false，表示执行失败
+ */
+export function reportVacuumNotSupported(operation: Operation): boolean {
+  operation.error(Constant.SQLITE_ERROR, Constant.MSG_VACUUM_NOT_SUPPORTED, SqlErrorInfo.getMap(operation));
+  return false;
+}
+
+/**
+ * 尝试在 OHOS RDB 上真正执行 VACUUM。
+ * VACUUM 非 DDL，插件按 DML/通用语句走 execute() 被 OHOS RDB 拒绝（曾误报 syntax error）；
+ * 但 DDL 路径 executeSql() 是否接受 VACUUM 取决于 RDB 引擎，因此先尝试真正执行，
+ * 引擎同样拒绝（14800021 / not supported）时才降级为明确的 not supported。
+ * @param sql VACUUM 语句
+ * @param operation 操作对象
+ * @param db RdbStore 实例
+ * @returns true 表示执行成功或已处理，false 表示失败
+ */
+export async function tryVacuumOrReportNotSupported(sql: string, operation: Operation,
+  db: relationalStore.RdbStore): Promise<boolean> {
+  try {
+    await db.executeSql(sql);
+    operation.success(null);
+    return true;
+  } catch (err) {
+    const businessErr = err as BusinessError;
+    // RDB 引擎拒绝该语句（generic/not supported）→ 返回明确错误；其他错误按原样上报
+    if (businessErr.code === Constant.RDB_ERROR_CODE_14800021 ||
+      (businessErr.message && businessErr.message.toLowerCase().includes('not supported'))) {
+      return reportVacuumNotSupported(operation);
+    }
+    operation.error(Constant.SQLITE_ERROR, `error code: ${businessErr.code}。${businessErr.message}`, '');
+    return false;
+  }
+}
+
+export class VacuumHandler extends BaseSqlHandler {
+  match(sql: string) {
+    return isVacuumStatement(sql);
+  }
+
+  execute(sql: string, operation: Operation, db: relationalStore.RdbStore): Promise<boolean> {
+    return tryVacuumOrReportNotSupported(sql, operation, db);
+  }
+
+  get needsPostProcess(): boolean {
+    return false;
   }
 }

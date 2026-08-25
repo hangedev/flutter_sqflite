@@ -1,3 +1,13 @@
+## 2.4.2-ohos-1.0.1 - 2026.8
+
+### Added
+
+* Added a `VACUUM` regression test in `sqflite_common_test` asserting the statement is never misreported as a `syntax error` on OHOS and that table data remains intact after the attempt.
+
+### Fixed
+
+* OHOS: `VACUUM` is no longer misreported as a `syntax error`. VACUUM statements are now intercepted by a new `VacuumHandler` in the SQL handler chain and guarded in the `execute`/`rawQuery` paths, attempting a real `executeSql` first and returning an explicit `VACUUM is not supported on this platform (OpenHarmony RDB)` error when the RDB engine rejects it.
+
 ## 2.4.2-ohos-1.0.0
 
 ### Added
