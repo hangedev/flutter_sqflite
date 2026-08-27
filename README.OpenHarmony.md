@@ -13,6 +13,29 @@ SQLite plugin for [Flutter](https://flutter.io), providing embedded SQL database
 
 ## Installation
 
+### Environment Setup
+
+Prepare the OpenHarmony development environment before building:
+
+1. Install [DevEco Studio](https://developer.huawei.com/consumer/cn/deveco-studio/) (5.1.0.828 or newer, see [Compatibility](#compatibility)) and launch it once so that the bundled toolchain (OH SDK, node, ohpm, hvigor, hdc) is downloaded and configured.
+2. Get the ohos release of Flutter matching your framework version (for example `oh-3.27.0-release` or `oh-3.35.7-release`, see the [TAG Version Mapping](#tag-version-mapping)) from the [flutter_flutter](https://gitcode.com/CPF-Flutter/flutter_flutter) repository, put its `bin` directory on your `PATH`, and check the toolchain:
+
+```bash
+export PATH=/path/to/flutter/bin:$PATH   # Windows: add to the PATH environment variable
+flutter doctor                           # all ohos-related items should pass
+```
+
+3. Connect an OpenHarmony device or start an emulator, and make sure it is visible to `hdc list targets`.
+4. Add the plugin dependency (see below), then build and run from the project directory:
+
+```bash
+flutter pub get
+flutter run                       # debug run on the connected device
+flutter build hap --release       # build a release HAP for OpenHarmony
+```
+
+### Add the Dependency
+
 Go to the project directory and add the following dependencies in pubspec.yaml:
 
 ```yaml
@@ -21,7 +44,7 @@ dependencies:
     git:
       url: "https://gitcode.com/CPF-Flutter/flutter_sqflite.git"
       # ref: Please select the TAG to the TAG Version Mapping
-      ref: 2.4.2-ohos-1.0.0   
+      ref: TAG # Select the TAG version that matches your Flutter framework version from the table below  
       path: sqflite
 ```
 
@@ -40,18 +63,43 @@ flutter pub get
 | 3.27                      | 2.4.2-ohos-1.0.1   | br_v2.4.2_ohos   |
 | 3.35                      | 2.4.2-ohos-1.0.1   | br_v2.4.2_ohos   |
 
+### Upgrade & Migration
+
+To upgrade from an older OpenHarmony adaptation (for example `2.2.8-ohos-1.0.0`, based on upstream sqflite 2.2.8) to the current `2.4.2-ohos-1.0.1` (based on upstream sqflite 2.4.2):
+
+1. Change the dependency `ref` in pubspec.yaml to the target TAG, then run `flutter pub get`:
+
+```yaml
+dependencies:
+  sqflite:
+    git:
+      url: "https://gitcode.com/CPF-Flutter/flutter_sqflite.git"
+      ref: 2.4.2-ohos-1.0.1
+      path: sqflite
+```
+
+2. Match the Flutter framework version to the TAG: `2.4.2-ohos-1.0.1` requires the Flutter 3.27 / 3.35 ohos releases (see the TAG Version Mapping above and [Compatibility](#compatibility)); upgrading the framework version also means upgrading the matching DevEco Studio / OH SDK toolchain.
+3. Review the behavioral changes shipped in the target release in [CHANGELOG.OpenHarmony.md](./CHANGELOG.OpenHarmony.md). Notable OHOS changes when moving from 2.2.x to 2.4.x:
+   * Platform-channel handling moved off the UI thread onto a background worker: large batch inserts no longer trigger `THREAD_BLOCK_6S` appfreeze (issues #45, #65) and large result sets are no longer limited by the SharedBlock 2MB transfer cap (issue #75).
+   * `VACUUM` is no longer misreported as a `syntax error`; the RDB engine attempts a real execution and returns an explicit "not supported on this platform (OpenHarmony RDB)" error when it rejects the statement. If your code relied on `VACUUM`, handle this error explicitly.
+4. The Dart API surface stays compatible with upstream sqflite (2.2.x → 2.4.x adds new APIs such as `queryCursor`); existing application code needs no change apart from the dependency `ref`. Re-run your database tests after upgrading.
+
 ## Constraints
 
 ### Compatibility
 
 This document is verified based on the following versions:
 
-1. Flutter: 3.27.5-ohos-0.0.1; SDK: 5.0.0(12); IDE: DevEco Studio: 5.1.0.828; ROM: 5.1.0.130 SP8;
-2. Flutter: 3.35.8-ohos-0.0.1; SDK: 6.0.2(22); IDE: DevEco Studio: 6.0.2.640; ROM: 6.0.0.328 SP22;
+1. Flutter: 3.27.5-ohos-0.0.1; SDK: 5.0.5(17); IDE: DevEco Studio: 5.1.0.828; ROM: 5.1.0.130 SP8;
+2. Flutter: 3.35.8-ohos-0.0.1; SDK: 5.0.5(17); IDE: DevEco Studio: 6.0.2.640; ROM: 6.0.0.328 SP22;
 
 ### **Permission Requirements**
 
 > The following permissions include the `system_basic` permission, but the default application permission is `normal`. Only the `normal` permission can be used. Therefore, the error **9568289** may be reported during the installation of the HAP package. For details, see [Document](https://developer.huawei.com/consumer/en/doc/harmonyos-guides-V5/bm-tool-V5#EN_TOPIC_0000001884757326__%E5%AE%89%E8%A3%85hap%E6%97%B6%E6%8F%90%E7%A4%BAcode9568289-error-install-failed-due-to-grant-request-permissions-failed) Change the application level to `system_basic`.
+
+### **Known Platform Differences**
+
+1. **BigInt arguments are stored as TEXT (SDK API ≥ 20)**: integer parameters outside `Number.MAX_SAFE_INTEGER` are bound as strings (a workaround for an RDB bigint-binding defect), so the value is persisted as TEXT instead of INTEGER and reads back as a `string`/`BigInt` instead of a `number`. Such columns have no integer semantics: `ORDER BY`, comparisons and aggregations follow text rules (e.g. `'10' < '9'`), and a TEXT value never compares equal to an INTEGER value. Treat these columns as text, or convert values after reading.
 
 ## Example
 
@@ -202,6 +250,24 @@ More information on supported types [here](https://github.com/tekartik/sqflite/b
 
 > [!TIP] If the value of **OpenHarmony Platform Support** is **yes**, it means that the ohos platform supports this property; **no** means the opposite; **partially** means some capabilities of this property are supported. The usage method is the same on different platforms and the effect is the same as that of iOS or Android.
 
+### SqfliteOhos
+
+`SqfliteOhos` is the OpenHarmony implementation of the sqflite platform interface (`sqflite_ohos` package, declared as the `dartPluginClass` in pubspec.yaml). It exposes a single public entry; the full sqflite API listed below is inherited from the `SqflitePlatform` base class and the `sqflite` app-facing package.
+
+| Name         | Type            | Parameter Type | Return Value | OpenHarmony Platform Support | Description                                                                                                                                                                    |
+|--------------|-----------------|----------------|--------------|------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| registerWith | Static Function | -              | void         | yes                          | Plugin registration entry, called automatically by the Flutter engine when the plugin is loaded. Registers the method-channel based database factory as the default sqflite `databaseFactory` (idempotent: an already registered factory is never replaced). |
+
+Applications normally never call it themselves. To register explicitly (for example in a custom host or in tests):
+
+```dart
+import 'package:sqflite_ohos/sqflite_ohos.dart';
+
+SqfliteOhos.registerWith();
+```
+
+### Top-level Functions
+
 | Name                 | Type | Parameter Type                                                   | Return Value                  | OpenHarmony Platform Support | Description                                                                           |
 |----------------------| --- |-------------------------------------------------------------------|-------------------------------| --- |---------------------------------------------------------------------------------------|
 | openDatabase         | Function | String path, [OpenDatabaseOptions](#opendatabaseoptions)? options | Future<[Database](#database)> | yes | Open the database with the specified path, and you can configure the opening options. |
@@ -211,7 +277,7 @@ More information on supported types [here](https://github.com/tekartik/sqflite/b
 | databaseExists       | Function | String path                                                       | Future\<bool\>                | yes | Check whether the database for the specified path exists.                             |
 
 
-#### Batch
+### Batch
 
 | Name       | Type | Parameter Type                                          | Return Value         | OpenHarmony Platform Support | Description |
 |------------| --- |----------------------------------------------------------|-----------------------|------------------| --- |
@@ -228,7 +294,7 @@ More information on supported types [here](https://github.com/tekartik/sqflite/b
 | rawUpdate  | Function | String sql, List<Object?>? arguments                     | void                  | yes              | Queue a raw update statement in the batch. |
 | update     | Function | [UpdateOption](#updateoption)                            | void                  | yes              | Queue an update operation in the batch. |
 
-#### Database
+### Database
 Inherited from [DatabaseExecutor](#databaseexecutortransaction), repeated methods will not be described again.
 
 | Name               | Type            | Parameter Type                                                          | Return Value     | OpenHarmony Platform Support | Description |
@@ -240,7 +306,7 @@ Inherited from [DatabaseExecutor](#databaseexecutortransaction), repeated method
 | devInvokeMethod    | Function (Deprecated) | String method, [Object? arguments]                                                            | Future\<T\>    | yes | Dev/test method; intended for development only in source code (`@Deprecated('Dev only')`). |
 | devInvokeSqlMethod | Function (Deprecated) | String method, String sql, [List<Object?>? arguments]                                         | Future\<T\>    | yes | Dev/test SQL helper; intended for development only (`@Deprecated('Dev only')`). |
 
-#### DatabaseExecutor/Transaction
+### DatabaseExecutor/Transaction
 
 | Name           | Type | Parameter Type                                       | Return Value                        | OpenHarmony Platform Support | Description |
 |----------------| --- |-------------------------------------------------------|-------------------------------------| --- | --- |
@@ -259,7 +325,7 @@ Inherited from [DatabaseExecutor](#databaseexecutortransaction), repeated method
 | setVersion     | Function | int version                                           | Future\<void\>                      | yes | Set the internal database version for open helpers and automatic version control. |
 | update         | Function | [UpdateOption](#updateoption)                         | Future\<int\>                       | yes | Execute update SQL and return affected row count. |
 
-#### DatabaseFactory
+### DatabaseFactory
 
 | Name             | Type     | Parameter Type                                                   | Return Value         | OpenHarmony Platform Support | Description |
 |------------------|----------|-------------------------------------------------------------------|----------------------| --- | --- |
@@ -269,7 +335,7 @@ Inherited from [DatabaseExecutor](#databaseexecutortransaction), repeated method
 | deleteDatabase   | Function       | String path                                                       | Future\<void\>       | yes | Deletes the database for the specified path.  |
 | databaseExists   | Function | String path                                                       | Future\<bool\>       | yes | Check whether the database for the specified path exists. |
 
-#### QueryCursor
+### QueryCursor
 
 | Name      | Type   | Parameter Type | Return Value           | OpenHarmony Platform Support | Description |
 |-----------|------|---|----------------------| --- | --- |
@@ -277,7 +343,7 @@ Inherited from [DatabaseExecutor](#databaseexecutortransaction), repeated method
 | close     | Function   | - | Future\<void\>       | yes | Close the cursor manually. |
 | moveNext  | Function   | - | Future\<bool\>       | yes | Move to the next row; when false is returned, the cursor closes automatically. |
 
-#### DatabaseException
+### DatabaseException
 
 `DatabaseException` is an abstract class (implementing `Exception`) and sqflite's unified wrapper for native SQLite errors; the OpenHarmony platform uses the concrete implementation `SqfliteDatabaseException`. Any inner exception is thrown wrapped in a `DatabaseException`.
 
@@ -294,8 +360,7 @@ Inherited from [DatabaseExecutor](#databaseexecutortransaction), repeated method
 | isUniqueConstraintError   | Function | [String? field] | bool  | yes | Whether it is a UNIQUE constraint violation; an optional field can be matched. |
 | isNotNullConstraintError  | Function | [String? field] | bool  | yes | Whether it is a NOT NULL constraint violation; an optional field can be matched. |
 
-### Properties
-#### OpenDatabaseOptions
+### OpenDatabaseOptions
 
 | Name           | Parameter Type                      | Require | OpenHarmony Platform Support | Description                        |
 |----------------|-------------------------------------|---------|--------------|---------------------------------------------------------|
@@ -308,7 +373,7 @@ Inherited from [DatabaseExecutor](#databaseexecutortransaction), repeated method
 | readOnly       | bool?                               | no       | yes          | Whether to open the database in read-only mode. Default: `false` |
 | singleInstance | bool?                               | no       | yes          | Whether to enforce the singleton pattern. Default: `true` |
 
-#### InsertOption
+### InsertOption
 
 | Name                | Parameter Type                      | Require  | OpenHarmony Platform Support | Description |
 |-------------------|---------------------------|-----| --- | --- |
@@ -317,7 +382,7 @@ Inherited from [DatabaseExecutor](#databaseexecutortransaction), repeated method
 | nullColumnHack    | String?                   | no   | yes | Optional column name used to insert NULL when `values` is empty. |
 | conflictAlgorithm | [ConflictAlgorithm](#conflictalgorithm)? | no   | yes | Conflict resolution strategy (formerly `ConflictAlgorithm`). |
 
-#### QueryOption
+### QueryOption
 
 | Name        | Parameter Type           | Require | OpenHarmony Platform Support | Description |
 |-----------|----------------| --- | --- | --- |
@@ -332,7 +397,7 @@ Inherited from [DatabaseExecutor](#databaseexecutortransaction), repeated method
 | limit     | int?           | no | yes | Maximum number of rows to return. |
 | offset    | int?           | no | yes | Row offset for the returned results. |
 
-#### QueryCursorOption
+### QueryCursorOption
 
 | Name         | Parameter Type           | Require | OpenHarmony Platform Support | Description |
 |------------|----------------| --- | --- | --- |
@@ -348,7 +413,7 @@ Inherited from [DatabaseExecutor](#databaseexecutortransaction), repeated method
 | offset     | int?           | no | yes | Row offset for the returned results. |
 | bufferSize | int?           | no | yes | Cursor buffer size, affecting low-level batch fetch behavior. |
 
-#### UpdateOption
+### UpdateOption
 
 | Name                | Parameter Type                      | Require | OpenHarmony Platform Support | Description |
 |-------------------|---------------------------| --- | --- | --- |
@@ -358,7 +423,7 @@ Inherited from [DatabaseExecutor](#databaseexecutortransaction), repeated method
 | whereArgs         | List<Object?>?            | no | yes | Argument list for placeholders in the WHERE clause. |
 | conflictAlgorithm | [ConflictAlgorithm](#conflictalgorithm)? | no | yes | Conflict resolution strategy. |
 
-#### ConflictAlgorithm
+### ConflictAlgorithm
 
 | Name       | Parameter Type | OpenHarmony Platform Support | Description |
 |------------| --- |---| --- |
@@ -368,7 +433,7 @@ Inherited from [DatabaseExecutor](#databaseexecutortransaction), repeated method
 | ignore     | Enum value | yes | Ignore the current row and continue when a conflict occurs. |
 | replace    | Enum value | yes | Replace the existing row when a conflict occurs. |
 
-#### Callback Types
+### Callback Types
 
 | Callback                    | Parameter Type                                                                            | OpenHarmony Platform Support | Description |
 |---------------------------|--------------------------------------------------------------------------------------| --- | --- |

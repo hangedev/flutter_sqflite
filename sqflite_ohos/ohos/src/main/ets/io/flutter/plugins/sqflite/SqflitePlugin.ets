@@ -57,12 +57,16 @@ export default class SqflitePlugin implements FlutterPlugin {
     // 防御重复 attach（热重启 / 多引擎同实例）：先终止旧 worker，
     // 避免泄漏 worker 线程与 RdbStore 句柄。
     if (this.sqfliteWorker != null) {
+      const previousWorker: worker.ThreadWorker = this.sqfliteWorker;
+      this.sqfliteWorker = null;
       try {
-        this.sqfliteWorker.terminate();
+        previousWorker.terminate();
       } catch (e) {
         Log.e('SqflitePlugin', 'terminate previous worker failed: ' + e);
       }
-      this.sqfliteWorker = null;
+      // 与 onDetachedFromEngine 保持一致：旧 worker 已终止，flush 旧 pending
+      // 避免异常重连场景下 Dart 侧请求永久悬挂。
+      this.flushPending();
     }
 
     try {
@@ -81,7 +85,14 @@ export default class SqflitePlugin implements FlutterPlugin {
         const data: SqfliteReply = e.data as SqfliteReply;
         const reply: BinaryReply | undefined = this.pending.get(data.seq);
         if (reply != null) {
-          reply.reply(data.result);
+          // 引擎关闭窗口期 reply 可能已失效（flushPending 同类调用已有防护），
+          // 此处对齐防护标准，避免主线程事件回调未捕获异常
+          try {
+            reply.reply(data.result);
+          } catch (err) {
+            Log.e('SqflitePlugin', 'reply failed for seq=' + data.seq + ': ' + err);
+          }
+          // 无论成败都删除，防止条目残留
           this.pending.delete(data.seq);
         }
       };
@@ -126,9 +137,23 @@ export default class SqflitePlugin implements FlutterPlugin {
   onDetachedFromEngine(binding: FlutterPluginBinding): void {
     if (this.messenger != null) {
       this.messenger.setMessageHandler(Constant.PLUGIN_KEY, null);
+      // 显式断开 messenger → rawHandler 闭包 → this 的引用链
+      this.messenger = null;
     }
     // engine 契约要求每条 message 都必须有回执，否则 Dart 侧 reply handler 泄漏。
     // detach 时对尚在 pending（worker 尚未回执）的请求统一回 null。
+    this.flushPending();
+    // 请求 worker 清理其持有的全部 RdbStore/游标/静态映射后自行退出
+    this.disposeWorker();
+    // 显式断开插件实例对 context 的引用（worker 的 onmessage/rawHandler 闭包
+    // 随 worker 对象被回收而释放，孤岛引用环可被 GC 回收）
+    this.context = null;
+  }
+
+  /**
+   * 对尚未回执的 pending 请求统一回 null 并清空（engine 契约：每条 message 必须有回执）
+   */
+  private flushPending(): void {
     this.pending.forEach((reply: BinaryReply) => {
       try {
         reply.reply(null);
@@ -137,8 +162,62 @@ export default class SqflitePlugin implements FlutterPlugin {
       }
     });
     this.pending.clear();
-    this.sqfliteWorker?.terminate();
-    this.sqfliteWorker = null;
+  }
+
+  /**
+   * 通知 worker 清理其模块内全部数据库/游标/静态状态后自行 close。
+   * worker 静态状态（dbMap/cursorMap 等）只在 worker 线程可见，主线程无法直接清理，
+   * 因此经 dispose 消息让 worker 自行释放；主线程以超时 terminate 兜底，
+   * 防止 RdbStore.close() 挂起导致线程泄漏。
+   */
+  private disposeWorker(): void {
+    const workerToDispose: worker.ThreadWorker | null = this.sqfliteWorker;
+    if (workerToDispose == null) {
+      return;
+    }
+    let disposeSent: boolean = false;
+    try {
+      const disposeTask: SqfliteTaskMessage = {
+        seq: Constant.WORKER_DISPOSE_SEQ,
+        message: new ArrayBuffer(0),
+        context: this.context,
+        dispose: true
+      };
+      workerToDispose.postMessage(disposeTask);
+      disposeSent = true;
+    } catch (e) {
+      Log.e('SqflitePlugin', 'postMessage dispose to worker failed: ' + e);
+    }
+    if (!disposeSent) {
+      this.terminateWorker();
+      return;
+    }
+    setTimeout(() => {
+      // 只终止捕获的旧 worker 引用，绝不误杀重连（热重启）后的新 worker；
+      // worker 已自行 close 时 terminate 抛错/幂等均无碍。
+      try {
+        workerToDispose.terminate();
+      } catch (e) {
+        // ignore：worker 已退出时 terminate 可能抛错。
+      }
+      if (this.sqfliteWorker === workerToDispose) {
+        this.sqfliteWorker = null;
+      }
+    }, Constant.WORKER_DISPOSE_TIMEOUT_MS);
+  }
+
+  /**
+   * 终止当前 worker 并断开字段引用（terminate 增加容错，确保释放链不因异常中断）
+   */
+  private terminateWorker(): void {
+    if (this.sqfliteWorker != null) {
+      try {
+        this.sqfliteWorker.terminate();
+      } catch (e) {
+        Log.e('SqflitePlugin', 'terminate worker failed: ' + e);
+      }
+      this.sqfliteWorker = null;
+    }
   }
 }
 
@@ -147,4 +226,13 @@ export default class SqflitePlugin implements FlutterPlugin {
 interface SqfliteReply {
   seq: number;
   result: ArrayBuffer | null;
+}
+
+// 发送给 worker 的任务消息（与 SqfliteWorker.ets 的 SqfliteTask 对应；
+// dispose=true 时 worker 清理全部资源后自行退出）
+interface SqfliteTaskMessage {
+  seq: number;
+  message: ArrayBuffer;
+  context: common.Context | null;
+  dispose?: boolean;
 }

@@ -7,6 +7,7 @@ import 'package:sqflite_example_common/debug_info_test_page.dart';
 import 'package:sqflite_example_common/deprecated_test_page.dart';
 import 'package:sqflite_example_common/exception_test_page.dart';
 import 'package:sqflite_example_common/exp_test_page.dart';
+import 'package:sqflite_example_common/inspection_verify_page.dart';
 import 'package:sqflite_example_common/manual_test_page.dart';
 import 'package:sqflite_example_common/multi_db_transaction_test_page.dart';
 import 'package:sqflite_example_common/open_database_behavior_test_page.dart';
@@ -99,6 +100,9 @@ const String testBenchRoute = '/test/bench';
 /// Big query test page (issue #75 大结果集查询).
 const String testBigQueryRoute = '/test/bigquery';
 
+/// Inspection verify test page (稳定性/内存泄露/一致性检视修复验证).
+const String testInspectionVerifyRoute = '/test/inspection_verify';
+
 /// Extra routes added by the application.
 Map<String, WidgetBuilder>? extraRoutes;
 
@@ -127,6 +131,8 @@ class _SqfliteExampleAppState extends State<SqfliteExampleApp> {
     testStressRoute: (BuildContext context) => const StressTestPage(),
     testBenchRoute: (BuildContext context) => const BenchTestPage(),
     testBigQueryRoute: (BuildContext context) => const BigQueryTestPage(),
+    testInspectionVerifyRoute: (BuildContext context) =>
+        const InspectionVerifyPage(),
   }..addAll(extraRoutes ?? {});
 
   @override
@@ -259,6 +265,13 @@ class MyHomePage extends StatefulWidget {
         '大结果集查询 (#75)',
         '大数据量查询序列化失败复现 + 游标分页对照',
         route: testBigQueryRoute,
+      ),
+    );
+    _items.add(
+      MainItem(
+        '检视问题验证',
+        '游标回收/detach 清理/参数校验/事务契约/零行查询/边界压力',
+        route: testInspectionVerifyRoute,
       ),
     );
     if (extraRoutes != null) {

@@ -6,6 +6,13 @@
 
 ### Fixed
 
+* OHOS: zero-row query results now always include the `columns` and `rows` keys, matching the upstream Android/iOS contract.
+* OHOS: transaction and `ATTACH`/`DETACH` failures now report a proper `sqlite_error` with the failing sql and arguments, instead of a generic error.
+* OHOS: unconsumed query cursors are now closed when their database is closed, deleted, or the plugin is disposed — previously the ResultSets leaked. A 64-cursor cap evicts the oldest cursor.
+* OHOS: `onDetachedFromEngine` now closes all databases and cursors and clears plugin state, instead of leaking them until process exit.
+* OHOS: invalid arguments (empty paths, malformed batch operations, missing `ATTACH`/`DETACH` parameters) now return precise errors instead of a generic failure.
+* OHOS: fixed premature null replies on async error paths; a failed `ROLLBACK` is now reported as an error instead of silently succeeding.
+* OHOS: hardened error paths around reply routing and database close, preventing unhandled rejections during engine teardown; removed dead code (`debugMode` argument, `SqlCommand.toValue`, `OperationRunnable`).
 * OHOS: `VACUUM` is no longer misreported as a `syntax error`. VACUUM statements are now intercepted by a new `VacuumHandler` in the SQL handler chain and guarded in the `execute`/`rawQuery` paths, attempting a real `executeSql` first and returning an explicit `VACUUM is not supported on this platform (OpenHarmony RDB)` error when the RDB engine rejects it.
 
 ## 2.4.2-ohos-1.0.0

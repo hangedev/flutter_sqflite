@@ -13,7 +13,6 @@
 * limitations under the License.
 */
 
-import ArrayList from '@ohos.util.ArrayList';
 import { ValueType } from '@ohos.data.ValuesBucket';
 
 export class SqlCommand {
@@ -31,15 +30,6 @@ export class SqlCommand {
       rawArguments = new Array;
     }
     this.rawArguments = rawArguments;
-  }
-
-  /**
-   * Handle list of int as byte[]
-   * @param value 值类型
-   * @returns 转换后的值
-   */
-  static toValue(value: ValueType): ValueType {
-    return value;
   }
 
   /**

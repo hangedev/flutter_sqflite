@@ -57,7 +57,12 @@ export class Database {
   private static currentTransactionId: number | null;
   // 游标管理用于分页查询
   private static cursorMap: Map<number, relationalStore.ResultSet> = new Map();
+  // 游标归属数据库（cursorId -> dbId）：closeDatabase/deleteDatabase 据此统一回收该库未消费游标
+  private static cursorDbMap: Map<number, number> = new Map();
   private static lastCursorId: number = 0;
+  // 未消费游标容量上限：达到后淘汰最旧游标，
+  // 防止业务侧只分页查询不消费时静态 Map 无上限累积
+  private static readonly MAX_OPEN_CURSORS: number = 64;
 
   constructor(context: common.Context, path: string, id: number, singleInstance: boolean, logLevel: number) {
     this.context = context;
@@ -497,10 +502,65 @@ export class Database {
     if (resultSet) {
       try {
         resultSet.close();
-        Database.cursorMap.delete(cursorId);
       } catch (err) {
         Log.e('Database', `Error closing cursor ${cursorId}: ${err}`);
+      } finally {
+        // close 抛错也必须移除条目，否则已失效的游标永久残留在 Map 中
+        Database.cursorMap.delete(cursorId);
+        Database.cursorDbMap.delete(cursorId);
       }
+    }
+  }
+
+  /**
+   * 关闭并移除指定数据库的所有未消费分页游标。
+   * closeDatabase / deleteDatabase 时调用，防止 ResultSet 句柄随库关闭悬挂泄漏
+   * （对齐 Android/iOS 在数据库关闭时统一回收游标的行为）。
+   * @param dbId 数据库ID
+   */
+  static closeCursorsByDbId(dbId: number): void {
+    const cursorIds: number[] = [];
+    Database.cursorDbMap.forEach((ownerDbId: number, cursorId: number) => {
+      if (ownerDbId === dbId) {
+        cursorIds.push(cursorId);
+      }
+    });
+    cursorIds.forEach((cursorId: number) => {
+      Database.closeCursor(cursorId);
+    });
+  }
+
+  /**
+   * 关闭并移除所有未消费分页游标（插件 dispose 时调用）
+   */
+  static closeAllCursors(): void {
+    Database.cursorMap.forEach((resultSet: relationalStore.ResultSet, cursorId: number) => {
+      try {
+        resultSet.close();
+      } catch (err) {
+        Log.e('Database', `Error closing cursor ${cursorId} on dispose: ${err}`);
+      }
+    });
+    Database.cursorMap.clear();
+    Database.cursorDbMap.clear();
+  }
+
+  /**
+   * 游标容量兜底：达到上限时淘汰最旧游标（cursorId 单调递增，最小者最旧）
+   */
+  private static evictOldestCursorIfNeeded(): void {
+    while (Database.cursorMap.size >= Database.MAX_OPEN_CURSORS) {
+      let oldestCursorId: number = -1;
+      Database.cursorMap.forEach((_resultSet: relationalStore.ResultSet, cursorId: number) => {
+        if (oldestCursorId < 0 || cursorId < oldestCursorId) {
+          oldestCursorId = cursorId;
+        }
+      });
+      if (oldestCursorId < 0) {
+        break;
+      }
+      Log.i('Database', `Open cursors reached ${Database.MAX_OPEN_CURSORS}, evicting oldest cursor ${oldestCursorId}`);
+      Database.closeCursor(oldestCursorId);
     }
   }
 
@@ -596,9 +656,10 @@ export class Database {
 
   /**
    * 处理游标分页（保存 ResultSet 以便后续分页）
+   * @param dbId 归属数据库ID，保存游标时记录，用于关闭数据库时统一回收
    */
   private static handleCursorPagination(resultSet: relationalStore.ResultSet, cursorPageSize: number | undefined,
-    results: Map<String, object>): number | null {
+    results: Map<String, object>, dbId: number | undefined): number | null {
     // 判断是否需要保存 ResultSet
     let cursorHasMoreData = false;
     if (cursorPageSize != null && cursorPageSize > 0) {
@@ -606,10 +667,15 @@ export class Database {
     }
 
     if (cursorHasMoreData) {
+      // 容量兜底：淘汰最旧游标，防止未消费游标无上限累积
+      Database.evictOldestCursorIfNeeded();
       // 保存 ResultSet
       Database.lastCursorId++;
       const savedCursorId = Database.lastCursorId;
       Database.cursorMap.set(savedCursorId, resultSet);
+      if (dbId !== undefined) {
+        Database.cursorDbMap.set(savedCursorId, dbId);
+      }
       results.set(Constant.PARAM_CURSOR_ID, savedCursorId as Object);
       return savedCursorId;
     }
@@ -634,6 +700,8 @@ export class Database {
 
     let cursorPageSize: number | undefined = operation.getArgument(Constant.PARAM_CURSOR_PAGE_SIZE);
     let sqlArguments: ValueType[] | undefined = operation.getArgument(Constant.PARAM_SQL_ARGUMENTS);
+    // 游标归属数据库ID：保存分页游标时记录，供 closeDatabase 统一回收
+    const dbId: number | undefined = operation.getArgument<number>(Constant.PARAM_ID);
     let resultSet: relationalStore.ResultSet | null = null;
     let savedCursorId: number | null = null;
 
@@ -650,7 +718,7 @@ export class Database {
       let results = Database.handleQuerySqlResult(resultSet, cursorPageSize);
 
       // 处理游标分页
-      savedCursorId = Database.handleCursorPagination(resultSet, cursorPageSize, results);
+      savedCursorId = Database.handleCursorPagination(resultSet, cursorPageSize, results, dbId);
 
       operation.success(results);
       return true;
@@ -658,16 +726,23 @@ export class Database {
     } catch (err) {
       Log.e('Database',
         `doQuery caught exception: code=${(err as BusinessError<void>).code}, message=${(err as BusinessError<void>).message}`);
-      Database.handleException(operation, err);
-      // 异常时清理
+      // handleException 为 async（14800032 分支内部 await），必须 await 完成，
+      // 否则 error envelope 在 worker 回执后才写入 captured，Dart 侧收到 null reply。
+      await Database.handleException(operation, err);
+      // 异常时清理：已保存的游标必须 close 并移除，仅删 Map 条目会泄漏 ResultSet 句柄
       if (savedCursorId != null) {
-        Database.cursorMap.delete(savedCursorId);
+        Database.closeCursor(savedCursorId);
       }
       return false;
     } finally {
-      // 如果没有保存，就关闭 ResultSet
+      // 如果没有保存，就关闭 ResultSet；close 抛错只记录不上抛，
+      // 与 closeCursor 的防御写法一致（否则 batch 场景单个 close 失败会中断整批）
       if (savedCursorId == null && resultSet != null) {
-        resultSet.close();
+        try {
+          resultSet.close();
+        } catch (err) {
+          Log.e('Database', `close query resultSet failed: ${JSON.stringify(err)}`);
+        }
       }
     }
   }
@@ -680,21 +755,26 @@ export class Database {
     let valuesType: Array<string> | null = null;
     let columnCount: number = 0;
 
+    // 列元数据不依赖行数据：零行结果集也写入 columns/rows 两键，
+    // 与上游 Android/iOS 任何查询必返 {'columns': [...], 'rows': []} 的结构承诺一致
+    columnCount = resultSet.columnCount;
+    columns = new Array<string>();
+    for (let i = 0; i < columnCount; i++) {
+      columns.push(resultSet.getColumnName(i));
+    }
+    results.set(Constant.PARAM_COLUMNS, columns);
+    results.set(Constant.PARAM_ROWS, rows);
+
     // resultSet是一个数据集合得游标，默认值想第-1个记录，有效的数据从0开始
     while (resultSet.goToNextRow()) {
-      if (columns == null) {
-        columnCount = resultSet.columnCount;
-        columns = new Array<string>();
+      if (valuesType == null) {
+        // 值类型从首行实际数据推断；零行时 rows 为空，valuesType 不会被消费
         valuesType = new Array<string>();
         let row: Record<string, ValueType> = resultSet.getRow() as Record<string, ValueType>;
         for (let i = 0; i < columnCount; i++) {
-          let columnName = resultSet.getColumnName(i);
-          columns.push(columnName);
-          let valueType: string = typeof row[columnName];
+          let valueType: string = typeof row[columns[i]];
           valuesType.push(valueType);
         }
-        results.set(Constant.PARAM_COLUMNS, columns);
-        results.set(Constant.PARAM_ROWS, rows);
       }
 
       let row = Database.cursorRowToList(resultSet, columnCount, valuesType);
@@ -745,9 +825,15 @@ export class Database {
     let noResult: boolean = mainOperation.getNoResult();
     let continueOnError: boolean = mainOperation.getContinueOnError();
 
-    let operations: Array<Map<string, Object>> =
-      mainOperation.getArgument(Constant.PARAM_OPERATIONS) as Array<Map<string, Object>>;
-    let results: Array<Map<string, Object>> = new Array();
+    // 参数校验：operations 必须为数组，缺失/类型错误时返回 bad_param，
+    // 避免 operations.length 遍历 undefined 抛 TypeError 只能靠 worker 顶层兜底
+    const operationsValue: object = mainOperation.getArgument<object>(Constant.PARAM_OPERATIONS);
+    if (!Array.isArray(operationsValue)) {
+      result.error(Constant.ERROR_BAD_PARAM, 'Batch: operations must be a list', null);
+      return;
+    }
+    let operations: Map<string, Object>[] = operationsValue as Map<string, Object>[];
+    let results: Map<string, Object>[] = [];
 
     for (let index = 0; index < operations.length; index++) {
 
