@@ -103,6 +103,12 @@ export class Constant {
   static API_17: number = 17;
   static API_20: number = 20;
   static DB_PATH_PARSING_BEGIN_INDEX: number = 6;
+  // worker dispose 请求的固定 seq：不参与主线程 pending 路由，
+  // worker 收到后自行清理资源并退出
+  static WORKER_DISPOSE_SEQ: number = -1;
+  // worker dispose 兜底强杀超时（毫秒）：正常 RdbStore.close 毫秒级完成，
+  // closeRdbStoreWithTimeout 单库 5s 超时兜底，此处留足余量后强制 terminate
+  static WORKER_DISPOSE_TIMEOUT_MS: number = 6000;
   static RDB_ERROR_CODE_801: number = 801;
   static RDB_ERROR_CODE_14800000: number = 14800000;
   static RDB_ERROR_CODE_14800011: number = 14800011;

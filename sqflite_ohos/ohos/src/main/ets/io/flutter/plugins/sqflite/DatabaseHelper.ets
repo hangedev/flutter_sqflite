@@ -24,6 +24,7 @@ import deviceInfo from '@ohos.deviceInfo';
 import MethodCall from '@ohos/flutter_ohos/src/main/ets/plugin/common/MethodCall';
 import fs from '@ohos.file.fs';
 import { HashMap } from '@kit.ArkTS';
+import { Database } from './Database';
 
 export class DatabaseHelper {
   // 已加载的数据库, 存储数据库名称与数据库实例
@@ -64,7 +65,16 @@ export class DatabaseHelper {
     }
 
     let id: number = -1;
-    let dbPath: string = call.argument(Constant.PARAM_PATH);
+    // 参数校验：path 必填且为非空字符串，缺失时返回精确的 open_failed 错误，
+    // 避免 dbPath.split('/') 抛 TypeError 只能靠 worker 顶层兜底
+    const dbPathValue: object = call.argument(Constant.PARAM_PATH);
+    if (typeof dbPathValue !== 'string' || (dbPathValue as string).length === 0) {
+      result.error(Constant.SQLITE_ERROR, `${Constant.ERROR_OPEN_FAILED} invalid path`, null);
+      return;
+    }
+    let dbPath: string = dbPathValue as string;
+    // 保存原始路径（用于 debug 返回完整路径；校验后必为 string）
+    const originalPath: string = dbPath;
     // 获取 singleInstance 和 logLevel 参数（用于 debug 返回实际值）
     // 注意：call.argument() 返回 object 类型，需要显式类型检查
     const singleInstanceValue: object = call.argument(Constant.PARAM_SINGLE_INSTANCE);
@@ -85,9 +95,6 @@ export class DatabaseHelper {
 
     let dbPathDirList: string[] = dbPath.split('/');
     let dbName: string = DatabaseHelper.getDatabaseNameByDbPathDirList(dbPathDirList);
-    // 保存原始路径（用于 debug 返回完整路径）
-    const originalPathValue: object = call.argument(Constant.PARAM_PATH);
-    const originalPath: string = (typeof originalPathValue === 'string') ? originalPathValue as string : dbPath;
 
     const isExisted: boolean = await DatabaseHelper.checkDatabaseExisted(dbPath);
     let local: relationalStore.RdbStore | null = DatabaseHelper.getDatabaseFromMemory(dbName);
@@ -318,6 +325,8 @@ export class DatabaseHelper {
       result.success(null);
       return;
     }
+    // 关闭该库未消费的分页游标，防止 ResultSet 句柄随库关闭悬挂泄漏（对齐 Android/iOS）
+    Database.closeCursorsByDbId(dbId);
     // 占位数据库: 清理占位条目并返回成功
     if (DatabaseHelper.invalidOpenDbErrors.hasKey(dbId)) {
       DatabaseHelper.removeDatabaseMappingsByDbId(dbId);
@@ -378,6 +387,9 @@ export class DatabaseHelper {
     let result: boolean = false;
     let dbPathDirList: string[] = dbPath.split('/');
     let dbName: string = DatabaseHelper.getDatabaseNameByDbPathDirList(dbPathDirList);
+
+    // 关闭该库所有未消费游标（deleteDatabase 仅有 path，按 dbName 关联清理）
+    DatabaseHelper.closeCursorsByDbName(dbName);
 
     try {
       // 与 Android 一致：先关闭已打开的数据库，再删除文件
@@ -444,7 +456,7 @@ export class DatabaseHelper {
    * @param result 方法结果对象
    */
   public static async debugMode(call: MethodCall, result: MethodResult): Promise<void> {
-    let on: boolean = call.args;
+    // 上游 obsolete since 1.17 的废弃通道：参数不再消费，仅回 null 保持协议兼容
     result.success(null);
   }
 
@@ -544,7 +556,11 @@ export class DatabaseHelper {
     logContext: string): Promise<void> {
     let timerId: number = -1;
     try {
-      const closePromise = local.close();
+      // 兜底 catch：超时竞胜后 close() 迟到的 rejection 无人消费会成为
+      // unhandled rejection，此处吞掉并记录
+      const closePromise = local.close().catch((closeErr: object) => {
+        Log.e('DatabaseHelper', `late close failure ${logContext}: ${JSON.stringify(closeErr)}`);
+      });
       const timeoutPromise = new Promise<void>((_, reject) => {
         timerId = setTimeout(() => reject(new Error('Close timeout')), 5000);
       });
@@ -594,5 +610,70 @@ export class DatabaseHelper {
     dbIdsToRemove.forEach((id: number) => {
       DatabaseHelper.removeDatabaseMappingsByDbId(id);
     });
+  }
+
+  /**
+   * 关闭指定数据库名称下的所有未消费分页游标（按 dbName 关联的所有 dbId 清理）
+   * @param dbName 数据库名称
+   */
+  private static closeCursorsByDbName(dbName: string): void {
+    const dbIds: number[] = [];
+    DatabaseHelper.dbIdMap.forEach((name: string, id: number) => {
+      if (name === dbName) {
+        dbIds.push(id);
+      }
+    });
+    dbIds.forEach((id: number) => {
+      Database.closeCursorsByDbId(id);
+    });
+  }
+
+  /**
+   * 释放全部静态状态：关闭所有分页游标与 RdbStore、删除内存库临时文件、
+   * 清空全部静态映射。
+   * 由插件 detach 时经 worker dispose 消息调用
+   * （引擎销毁/热重启场景回收句柄，避免悬挂至进程退出）。
+   */
+  public static async dispose(): Promise<void> {
+    // 先关闭所有未消费游标
+    Database.closeAllCursors();
+
+    // 删除内存数据库的临时文件（关闭 RdbStore 前记录名称，避免遍历中被清理）
+    const memoryDbNames: string[] = [];
+    DatabaseHelper.memoryDbMap.forEach((name: string) => {
+      memoryDbNames.push(name);
+    });
+
+    // 并行关闭所有已打开的 RdbStore（单个 close 有 5s 超时兜底）
+    const closeTasks: Promise<void>[] = [];
+    DatabaseHelper.dbMap.forEach((store: relationalStore.RdbStore, dbName: string) => {
+      closeTasks.push(DatabaseHelper.closeRdbStoreWithTimeout(store, `on dispose ${dbName}`));
+    });
+    await Promise.all(closeTasks);
+
+    if (DatabaseHelper.appContext != null && memoryDbNames.length > 0) {
+      for (const tempDbName of memoryDbNames) {
+        try {
+          const config: relationalStore.StoreConfig = {
+            name: tempDbName,
+            securityLevel: relationalStore.SecurityLevel.S1
+          };
+          await relationalStore.deleteRdbStore(DatabaseHelper.appContext, config);
+        } catch (deleteErr) {
+          Log.e('DatabaseHelper', `dispose: failed to delete temp db file: ${JSON.stringify(deleteErr)}`);
+        }
+      }
+    }
+
+    // 清空全部静态映射，杜绝热重启/多引擎场景下旧引擎状态残留
+    DatabaseHelper.dbMap.clear();
+    DatabaseHelper.dbIdMap.clear();
+    DatabaseHelper.memoryDbMap.clear();
+    DatabaseHelper.dbPathMap.clear();
+    DatabaseHelper.dbSingleInstanceMap.clear();
+    DatabaseHelper.dbLogLevelMap.clear();
+    DatabaseHelper.transactionDepthByDbName.clear();
+    DatabaseHelper.transactionCreatedTablesByDbName.clear();
+    DatabaseHelper.invalidOpenDbErrors.clear();
   }
 }

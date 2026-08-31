@@ -51,6 +51,8 @@ interface SqfliteTask {
   seq: number;
   message: ArrayBuffer;
   context: common.Context;
+  // true 表示插件 detach 请求：清理全部资源后自行退出，不进入串行队列
+  dispose?: boolean;
 }
 
 // 串行队列：逐条 await，保证 worker 内一次只处理一条 message（等价 Android THREAD_COUNT=1）。
@@ -58,11 +60,33 @@ const queue: SqfliteTask[] = [];
 let running: boolean = false;
 
 workerPort.onmessage = (e: MessageEvents): void => {
-  queue.push(e.data as SqfliteTask);
+  const task: SqfliteTask = e.data as SqfliteTask;
+  // 插件 detach：插队执行全量资源清理（在途任务的回执此时已无意义，
+  // 主线程已 flush pending，其 seq 路由不到 reply 会被忽略；
+  // 清理与在途任务并发只会让后者报错回执，不会崩溃）。
+  if (task.dispose === true) {
+    handleDispose();
+    return;
+  }
+  queue.push(task);
   if (!running) {
     runQueue();
   }
 };
+
+// 引擎 detach 时释放 worker 模块持有的全部资源（RdbStore/分页游标/静态映射）后自行退出。
+// 不进串行队列：队列可能积压大 batch 任务（解码可达数秒），
+// 排队等待会错过主线程的兜底 terminate。
+// 兜底强杀由主线程负责，此处 close 失败最终也会被 terminate 回收。
+async function handleDispose(): Promise<void> {
+  try {
+    await DatabaseHelper.dispose();
+  } catch (err) {
+    Log.e('SqfliteWorker', `dispose error: ${err}`);
+  } finally {
+    workerPort.close();
+  }
+}
 
 // running 必须在 finally 里复位：若 handleOne reject（例如 postMessage 传输失败），
 // 不复位会让此后到达的每条 message 永久滞留队列、never 派发，整条 sqflite 通道假死。
@@ -146,16 +170,16 @@ async function dispatch(call: MethodCall, result: MethodResult, context: common.
       await handleBatchCall(call, result);
       break;
     case Constant.METHOD_OPTIONS:
-      DatabaseHelper.options(call, result);
+      await DatabaseHelper.options(call, result);
       break;
     case Constant.METHOD_DEBUG:
-      DatabaseHelper.onDebug(call, result);
+      await DatabaseHelper.onDebug(call, result);
       break;
     case Constant.METHOD_DEBUG_MODE:
-      DatabaseHelper.debugMode(call, result);
+      await DatabaseHelper.debugMode(call, result);
       break;
     case Constant.METHOD_GET_PLATFORM_VERSION:
-      DatabaseHelper.getPlatformVersion(call, result);
+      await DatabaseHelper.getPlatformVersion(call, result);
       break;
     case Constant.METHOD_CLOSE_DATABASE:
       await handleCloseDatabaseCall(call, result);
@@ -178,7 +202,13 @@ function handleGetDatabasesPathCall(context: common.Context, result: MethodResul
 
 ///检查数据库是否存在
 async function handleDatabaseExistsCall(call: MethodCall, result: MethodResult): Promise<void> {
-  let dbPath: string = call.argument(Constant.PARAM_PATH) as string;
+  // 参数校验：path 必填且为非空字符串，缺失时返回 bad_param 而非 fs.access 抛 TypeError
+  const dbPathValue: object = call.argument(Constant.PARAM_PATH);
+  if (typeof dbPathValue !== 'string' || (dbPathValue as string).length === 0) {
+    result.error(Constant.ERROR_BAD_PARAM, 'databaseExists: invalid path', null);
+    return;
+  }
+  let dbPath: string = dbPathValue as string;
   let isExist: boolean = await DatabaseHelper.checkDatabaseExisted(dbPath);
   result.success(isExist);
 }
@@ -252,7 +282,13 @@ async function handleCloseDatabaseCall(call: MethodCall, result: MethodResult): 
 ///删除数据库
 async function handleDeleteDatabaseCall(context: common.Context, call: MethodCall,
   result: MethodResult): Promise<void> {
-  let dataBaseName: string = call.argument(Constant.PARAM_PATH) as string;
+  // 参数校验：path 必填且为非空字符串，缺失时返回 bad_param 而非 split 抛 TypeError
+  const dbPathValue: object = call.argument(Constant.PARAM_PATH);
+  if (typeof dbPathValue !== 'string' || (dbPathValue as string).length === 0) {
+    result.error(Constant.ERROR_BAD_PARAM, 'deleteDatabase: invalid path', null);
+    return;
+  }
+  let dataBaseName: string = dbPathValue as string;
   let res = await DatabaseHelper.deleteDatabase(context, dataBaseName);
   if (res) {
     result.success(null);

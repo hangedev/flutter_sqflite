@@ -75,8 +75,17 @@ export class BeginImmediateHandler extends BaseSqlHandler {
   }
 
   execute(_sql: string, operation: Operation, db: relationalStore.RdbStore): boolean {
-    db.beginTransaction();
-    return true;
+    try {
+      db.beginTransaction();
+      return true;
+    } catch (err) {
+      // 开启事务失败如实上报 sqlite_error，避免沿 worker 顶层兜底退化为通用 'error' 信封
+      const error = err as BusinessError;
+      operation.error(Constant.SQLITE_ERROR,
+        `begin immediate failed, error code: ${error.code}. message is ${error.message}`,
+        SqlErrorInfo.getMap(operation));
+      return false;
+    }
   }
 
   get needsPostProcess(): boolean {
@@ -93,8 +102,17 @@ export class CommitHandler extends BaseSqlHandler {
   }
 
   execute(sql: string, operation: Operation, db: relationalStore.RdbStore) {
-    db.commit();
-    return true;
+    try {
+      db.commit();
+      return true;
+    } catch (err) {
+      // 提交失败如实上报 sqlite_error（与 RollbackHandler 防护标准一致）
+      const error = err as BusinessError;
+      operation.error(Constant.SQLITE_ERROR,
+        `commit failed, error code: ${error.code}. message is ${error.message}`,
+        SqlErrorInfo.getMap(operation));
+      return false;
+    }
   }
 
   get needsPostProcess(): boolean {
@@ -115,7 +133,12 @@ export class RollbackHandler extends BaseSqlHandler {
       db.rollBack();
       return true;
     } catch (err) {
-      return true; 
+      // 回滚失败上报错误而非静默成功，避免掩盖真实失败（与 attach/detach 错误格式一致）
+      const error = err as BusinessError;
+      operation.error(Constant.SQLITE_ERROR,
+        `rollback failed, error code: ${error.code}. message is ${error.message}`,
+        SqlErrorInfo.getMap(operation));
+      return false;
     }
   }
 
@@ -130,7 +153,7 @@ export class RollbackHandler extends BaseSqlHandler {
 export class BeginExclusiveHandler extends BaseSqlHandler {
   match(sql: string) {
     const upperSql = sql.toUpperCase();
-    return upperSql === Constant.SQL_BEGIN_EXCLUSIVE || 
+    return upperSql === Constant.SQL_BEGIN_EXCLUSIVE ||
            upperSql === Constant.SQL_BEGIN_EXCLUSIVE + ' TRANSACTION';
   }
   execute(_sql: string, operation: Operation, _db: relationalStore.RdbStore) {
@@ -152,11 +175,17 @@ export class AttachHandler extends BaseSqlHandler {
 
   private async handleAttach(db: relationalStore.RdbStore, sql: string, operation: Operation): Promise<boolean> {
     const sqlArguments: string[] | undefined = operation.getArgument(Constant.PARAM_SQL_ARGUMENTS);
+    // 参数校验：语句含 '?' 占位符时必须提供参数数组，避免非空断言抛 TypeError
+    const missingArguments: boolean = sqlArguments === undefined || sqlArguments.length === 0;
 
     const exprPattern = /attach\s+(?:database\s+)?([^\s;]+?)(?:\s+as\s+)/i;
     const exprMatch = sql.match(exprPattern);
     let fullPath: string = '';
     if (exprMatch) {
+      if (exprMatch[1].trim() == '?' && missingArguments) {
+        operation.error(Constant.SQLITE_ERROR, 'attach: missing sql arguments', '');
+        return false;
+      }
       fullPath = ((exprMatch[1].trim() == '?') ? sqlArguments![0] : exprMatch[1].trim());
       // 移除路径两边的引号 (单引号或双引号)
       fullPath = fullPath.replace(/^['"]|['"]$/g, '');
@@ -166,6 +195,10 @@ export class AttachHandler extends BaseSqlHandler {
     const schemaMatch = sql.match(schemaPattern);
     let attachName: string = '';
     if (schemaMatch) {
+      if (schemaMatch[1].trim() == '?' && missingArguments) {
+        operation.error(Constant.SQLITE_ERROR, 'attach: missing sql arguments', '');
+        return false;
+      }
       attachName = ((schemaMatch[1].trim() == '?') ? (sqlArguments![sqlArguments!.length - 1]) : schemaMatch[1].trim());
       // 移除 schema 名称两边的引号
       attachName = attachName.replace(/^['"]|['"]$/g, '');
@@ -177,7 +210,9 @@ export class AttachHandler extends BaseSqlHandler {
       return true;
     } catch (err) {
       const error = err as BusinessError;
-      operation.error(Constant.SQLITE_ERROR, `attach failed, error code: ${error.code}. message is ${error.message}`, '');
+      operation.error(Constant.SQLITE_ERROR,
+        `attach failed, error code: ${error.code}. message is ${error.message}`,
+        SqlErrorInfo.getMap(operation));
       return false;
     }
   }
@@ -194,11 +229,17 @@ export class DetachHandler extends BaseSqlHandler {
 
   private async handleDetach(db: relationalStore.RdbStore, sql: string, operation: Operation): Promise<boolean> {
     const sqlArguments: string[] | undefined = operation.getArgument(Constant.PARAM_SQL_ARGUMENTS);
+    // 参数校验：语句含 '?' 占位符时必须提供参数数组，避免非空断言抛 TypeError
+    const missingArguments: boolean = sqlArguments === undefined || sqlArguments.length === 0;
 
     const schemaPattern = /detach\s+(?:database\s+)?([^\s;]+)/i;
     const schemaMatch = sql.match(schemaPattern);
     let attachName: string = '';
     if (schemaMatch) {
+      if (schemaMatch[1].trim() == '?' && missingArguments) {
+        operation.error(Constant.SQLITE_ERROR, 'detach: missing sql arguments', '');
+        return false;
+      }
       attachName = ((schemaMatch[1].trim() == '?') ? (sqlArguments![0]) : schemaMatch[1].trim());
     }
 
@@ -208,7 +249,9 @@ export class DetachHandler extends BaseSqlHandler {
       return true;
     } catch (err) {
       const error = err as BusinessError;
-      operation.error(Constant.SQLITE_ERROR, `detach failed, error code: ${error.code}. message is ${error.message}`, '');
+      operation.error(Constant.SQLITE_ERROR,
+        `detach failed, error code: ${error.code}. message is ${error.message}`,
+        SqlErrorInfo.getMap(operation));
       return false;
     }
   }
