@@ -41,6 +41,9 @@ export class MethodCallOperation extends BaseOperation {
     let isApproved =
       ((key == Constant.PARAM_SQL_ARGUMENTS) || (key == Constant.PARAM_OPERATIONS)) && (argument instanceof Array) &&
         (sdkApiVersion >= Constant.API_20);
+    // 平台限制：relationalStore 绑定参数类型 ValueType 仅含 number|string|boolean（无 bigint/long），
+    // |v|>2^53 的 BigInt 只能转为字符串按 TEXT 绑定（INTEGER 亲和性列仍存为整数）。
+    // 已在 README.OpenHarmony(.md/_CN.md) 的 Known Issues/遗留问题 中标注该差异。
     if (isApproved) {
       if (key == Constant.PARAM_OPERATIONS) {
         argument.forEach((argument_map: Any) => {

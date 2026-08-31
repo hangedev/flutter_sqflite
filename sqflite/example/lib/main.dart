@@ -14,6 +14,7 @@ import 'model/main_item.dart';
 import 'new_features_test_page.dart';
 import 'open_test_page.dart';
 import 'raw_test_page.dart';
+import 'resource_test_page.dart';
 import 'rw_split_test_page.dart';
 import 'slow_test_page.dart';
 import 'stress_test_page.dart';
@@ -94,6 +95,9 @@ const String testBigQueryRoute = '/test/bigquery';
 /// Transaction repro test page (issue 14800021).
 const String testTransactionReproRoute = '/test/transaction_repro';
 
+/// Resource & stability regression test page (游标/事务/错误信封/临时文件).
+const String testResourceRoute = '/test/resource';
+
 class _SqfliteExampleAppState extends State<SqfliteExampleApp> {
   var routes = <String, WidgetBuilder>{
     '/test': (BuildContext context) => MyHomePage(),
@@ -114,6 +118,7 @@ class _SqfliteExampleAppState extends State<SqfliteExampleApp> {
     testBigQueryRoute: (BuildContext context) => const BigQueryTestPage(),
     testTransactionReproRoute: (BuildContext context) =>
         const TransactionReproPage(),
+    testResourceRoute: (BuildContext context) => ResourceTestPage(),
   };
 
   @override
@@ -157,6 +162,7 @@ class MyHomePage extends StatefulWidget {
     _items.add(MainItem('单次操作耗时基准', '建表/插入/修改/查询单次端到端耗时统计 (验证 6c42dd2)', route: testBenchRoute));
     _items.add(MainItem('大结果集查询 (#75)', '大数据量查询序列化失败复现 + 游标分页对照', route: testBigQueryRoute));
     _items.add(MainItem('Transaction Repro (issue 14800021)', 'Reproduce BEGIN TRANSACTION error 14800021 on OHOS', route: testTransactionReproRoute));
+    _items.add(MainItem('稳定性与资源管理回归', '游标关库清理/LRU 上限/事务中断/失败信封/畸形消息/临时文件清理验证', route: testResourceRoute));
 
     // Uncomment to view all logs
     //Sqflite.devSetDebugModeOn(true);

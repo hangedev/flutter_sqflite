@@ -52,7 +52,7 @@ export abstract class BaseReadOperation implements Operation {
   }
 
   getContinueOnError(): boolean {
-    if(this.getArgument<object>(Constant.PARAM_CONTINUE_OR_ERROR)) {
+    if(this.getArgument<object>(Constant.PARAM_CONTINUE_ON_ERROR)) {
       return true;
     }
     return false;

@@ -44,7 +44,9 @@ class RwSplitTestPage extends StatefulWidget {
 
 class _RwSplitTestPageState extends State<RwSplitTestPage> {
   final List<_LogLine> _logs = [];
-  bool _busy = false;
+  // 正在运行的场景 tag;null=空闲。运行中的按钮显示进度环,其余按钮禁用,
+  // 避免全部按钮同灰同亮、看不出谁在跑的"状态串台"感。
+  String? _runningTag;
   final ScrollController _scrollController = ScrollController();
 
   // ────────────────────────────────────────────────────────────────────
@@ -75,8 +77,8 @@ class _RwSplitTestPageState extends State<RwSplitTestPage> {
     String title,
     Future<void> Function() fn,
   ) async {
-    if (_busy) return;
-    setState(() => _busy = true);
+    if (_runningTag != null) return;
+    setState(() => _runningTag = tag);
     _log(tag, '──── ▶ $title ────');
     try {
       await fn();
@@ -85,7 +87,7 @@ class _RwSplitTestPageState extends State<RwSplitTestPage> {
       _log(tag, '场景异常: $e', ok: false);
       if (kDebugMode) print(st);
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) setState(() => _runningTag = null);
     }
   }
 
@@ -100,15 +102,18 @@ class _RwSplitTestPageState extends State<RwSplitTestPage> {
     final result = <String, Set<String>>{};
     final roots = <Directory>[Directory(base), Directory(base).parent];
 
-    void scan(Directory dir, int depth) {
+    // 用异步遍历而非 listSync:同步递归扫描会阻塞 UI 线程,期间"禁用按钮"的
+    // 那一帧渲染不出来,用户点击走旧 build 的 onPressed 被静默吞掉——
+    // 这正是按钮状态"串台"的根因。
+    Future<void> scan(Directory dir, int depth) async {
       if (depth > 6) return;
       try {
-        for (final entity in dir.listSync()) {
+        await for (final entity in dir.list()) {
           if (entity is File && entity.path.endsWith('.db')) {
             final name = basename(entity.path);
             result.putIfAbsent(name, () => <String>{}).add(entity.path);
           } else if (entity is Directory) {
-            scan(entity, depth + 1);
+            await scan(entity, depth + 1);
           }
         }
       } catch (_) {
@@ -117,9 +122,7 @@ class _RwSplitTestPageState extends State<RwSplitTestPage> {
     }
 
     for (final r in roots) {
-      try {
-        scan(r, 0);
-      } catch (_) {}
+      await scan(r, 0);
     }
     return result;
   }
@@ -347,12 +350,27 @@ class _RwSplitTestPageState extends State<RwSplitTestPage> {
     super.dispose();
   }
 
-  Widget _btn(String label, Future<void> Function() onTap) {
+  Widget _btn(String label, String tag, Future<void> Function() onTap) {
+    final running = _runningTag == tag;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       child: ElevatedButton(
-        onPressed: _busy ? null : onTap,
-        child: Text(label),
+        onPressed: _runningTag != null ? null : onTap,
+        // 运行中的按钮带进度环,与其余(仅禁用置灰的)按钮区分开
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            if (running) ...<Widget>[
+              const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              const SizedBox(width: 6),
+            ],
+            Text(label),
+          ],
+        ),
       ),
     );
   }
@@ -381,19 +399,20 @@ class _RwSplitTestPageState extends State<RwSplitTestPage> {
             child: Wrap(
               alignment: WrapAlignment.center,
               children: <Widget>[
-                _btn('A 单层子目录', () => _runScenario('A', '单层子目录 写入+查询', () => _writeQueryCase(tag: 'A', title: '单层子目录', relPath: const ['flutter', 'repro_a.db']))),
-                _btn('B 深层子目录', () => _runScenario('B', '深层子目录 写入+查询', () => _writeQueryCase(tag: 'B', title: '深层子目录', relPath: const ['deep', 'nest', 'repro_b.db']))),
-                _btn('C 纯文件名', () => _runScenario('C', '纯文件名 写入+查询 (对照组)', () => _writeQueryCase(tag: 'C', title: '纯文件名', relPath: const ['repro_c.db']))),
-                _btn('D 关闭重开再读', () => _runScenario('D', '关闭重开再读 (逼走 TaskPool 重建)', _readAfterReopenCase)),
-                _btn('G 先读后写时序', () => _runScenario('G', '先读后写时序 (读路径首次打开)', _readBeforeWriteCase)),
-                _btn('E PRAGMA落点', () => _runScenario('E', 'PRAGMA database_list 挂载路径', _pragmaListCase)),
-                _btn('F 全盘扫描汇总', () => _runScenario('F', '全盘扫描 repro_*.db 分叉情况', _summaryScanCase)),
-                _btn('清空全部数据', () async {
+                _btn('A 单层子目录', 'A', () => _runScenario('A', '单层子目录 写入+查询', () => _writeQueryCase(tag: 'A', title: '单层子目录', relPath: const ['flutter', 'repro_a.db']))),
+                _btn('B 深层子目录', 'B', () => _runScenario('B', '深层子目录 写入+查询', () => _writeQueryCase(tag: 'B', title: '深层子目录', relPath: const ['deep', 'nest', 'repro_b.db']))),
+                _btn('C 纯文件名', 'C', () => _runScenario('C', '纯文件名 写入+查询 (对照组)', () => _writeQueryCase(tag: 'C', title: '纯文件名', relPath: const ['repro_c.db']))),
+                _btn('D 关闭重开再读', 'D', () => _runScenario('D', '关闭重开再读 (逼走 TaskPool 重建)', _readAfterReopenCase)),
+                _btn('G 先读后写时序', 'G', () => _runScenario('G', '先读后写时序 (读路径首次打开)', _readBeforeWriteCase)),
+                _btn('E PRAGMA落点', 'E', () => _runScenario('E', 'PRAGMA database_list 挂载路径', _pragmaListCase)),
+                _btn('F 全盘扫描汇总', 'F', () => _runScenario('F', '全盘扫描 repro_*.db 分叉情况', _summaryScanCase)),
+                _btn('清空全部数据', 'SYS', () => _runScenario('SYS', '清空全部 repro_* 数据', () async {
                   // 作为重置入口:先清空页面日志,再删数据文件,给一个干净的重新开始。
+                  // 清日志必须放在 _runScenario 的 busy 门内执行:
+                  // 否则场景运行中点它,日志被清而清数据被静默吞掉(半执行)。
                   setState(_logs.clear);
-                  await _runScenario('SYS', '清空全部 repro_* 数据',
-                      () => purgeByNamePrefix('repro_', tag: 'SYS'));
-                }),
+                  await purgeByNamePrefix('repro_', tag: 'SYS');
+                })),
               ],
             ),
           ),

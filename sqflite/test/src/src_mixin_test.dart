@@ -153,11 +153,18 @@ class MockInvalidFactory extends DatabaseFactory {
   }
 }
 
-final MockDatabaseFactory mockDatabaseFactory = MockDatabaseFactory();
+/// Factory shared by the tests below, recreated for each test to avoid
+/// sharing state between them.
+late MockDatabaseFactory mockDatabaseFactory;
 
 void run() {
+  setUp(() {
+    mockDatabaseFactory = MockDatabaseFactory();
+  });
+
   group('database_factory', () {
-    test('getDatabasesPath', () async {
+    test('should fail when the native getDatabasesPath returns null',
+        () async {
       final factory = MockDatabaseFactoryEmpty();
       try {
         await factory.getDatabasesPath();
@@ -168,7 +175,8 @@ void run() {
     });
   });
   group('database', () {
-    test('transaction', () async {
+    test('should run crud calls and a transaction on a mock database',
+        () async {
       final Database db = mockDatabaseFactory.newEmptyDatabase();
       await db.execute('test');
       await db.insert('test', <String, Object?>{'test': 1});
@@ -194,7 +202,7 @@ void run() {
     });
 
     group('open', () {
-      test('read-only', () async {
+      test('should forward the read only flag when opening', () async {
         // var db = mockDatabaseFactory.newEmptyDatabase();
         final db = await mockDatabaseFactory.openDatabase('test',
                 options: SqfliteOpenDatabaseOptions(readOnly: true))
@@ -208,7 +216,7 @@ void run() {
           'singleInstance': true
         });
       });
-      test('not single_instance', () async {
+      test('should forward the single instance flag when opening', () async {
         // var db = mockDatabaseFactory.newEmptyDatabase();
         final db = await mockDatabaseFactory.openDatabase('single_instance.db',
                 options: SqfliteOpenDatabaseOptions(singleInstance: false))
@@ -222,7 +230,7 @@ void run() {
         });
       });
 
-      test('rollback transaction', () async {
+      test('should rollback an unfinished transaction on close', () async {
         // var db = mockDatabaseFactory.newEmptyDatabase();
         final db = await mockDatabaseFactory.openDatabase(
                 'rollback_transaction.db',
@@ -244,7 +252,7 @@ void run() {
           'inTransaction': false
         });
       });
-      test('isOpen', () async {
+      test('should report the open state while closing', () async {
         // var db = mockDatabaseFactory.newEmptyDatabase();
         final db = await mockDatabaseFactory.openDatabase('is_open.db',
                 options: SqfliteOpenDatabaseOptions(readOnly: true))
@@ -257,7 +265,8 @@ void run() {
         expect(db.isOpen, false);
       });
 
-      test('reOpenSameVersion', () async {
+      test('should skip the version migration when reopening at the same '
+          'version', () async {
         var db = await mockDatabaseFactory.openDatabase('on_reopen.db',
             options: OpenDatabaseOptions(
               version: 1,
@@ -284,7 +293,7 @@ void run() {
       });
     });
     group('openTransaction', () {
-      test('onCreate', () async {
+      test('should run onCreate inside the open transaction', () async {
         final db = await mockDatabaseFactory.openDatabase('on_create.db',
             options: SqfliteOpenDatabaseOptions(
                 version: 1,
@@ -320,7 +329,7 @@ void run() {
         ]);
       });
 
-      test('onConfigure', () async {
+      test('should run onConfigure before the version migration', () async {
         final db = await mockDatabaseFactory.openDatabase('on_configure.db',
             options: OpenDatabaseOptions(
                 version: 1,
@@ -347,7 +356,7 @@ void run() {
         ]);
       });
 
-      test('onOpen', () async {
+      test('should run onOpen after the version migration', () async {
         final db = await mockDatabaseFactory.openDatabase('on_open',
             options: OpenDatabaseOptions(
                 version: 1,
@@ -374,7 +383,8 @@ void run() {
         ]);
       });
 
-      test('batch', () async {
+      test('should run batches committed from the open callbacks',
+          () async {
         final db = await mockDatabaseFactory.openDatabase('test',
             options: OpenDatabaseOptions(
                 version: 1,
@@ -476,7 +486,8 @@ void run() {
     });
 
     group('concurrency', () {
-      test('concurrent 1', () async {
+      test('should block a plain execute while a transaction is running',
+          () async {
         final db = mockDatabaseFactory.newEmptyDatabase() as MockDatabase;
         final step1 = Completer<dynamic>();
         final step2 = Completer<dynamic>();
@@ -488,7 +499,7 @@ void run() {
 
           await step2.future;
           try {
-            await db.execute('test').timeout(const Duration(milliseconds: 100));
+            await db.execute('test').timeout(const Duration(seconds: 1));
             throw 'should fail';
           } catch (e) {
             expect(e is TimeoutException, true);
@@ -519,7 +530,8 @@ void run() {
         await db.transaction<dynamic>((_) async {});
       });
 
-      test('concurrent 2', () async {
+      test('should block a plain execute started inside a transaction scope',
+          () async {
         final db = mockDatabaseFactory.newEmptyDatabase() as MockDatabase;
         final step1 = Completer<dynamic>();
         final step2 = Completer<dynamic>();
@@ -531,7 +543,7 @@ void run() {
 
           await step2.future;
           try {
-            await db.execute('test').timeout(const Duration(milliseconds: 100));
+            await db.execute('test').timeout(const Duration(seconds: 1));
             throw 'should fail';
           } catch (e) {
             expect(e is TimeoutException, true);
@@ -561,7 +573,8 @@ void run() {
     });
 
     group('compatibility 1', () {
-      test('concurrent 1', () async {
+      test('should block executes queued before the transaction starts',
+          () async {
         final db = mockDatabaseFactory.newEmptyDatabase() as MockDatabase;
         final step1 = Completer<dynamic>();
         final step2 = Completer<dynamic>();
@@ -573,7 +586,7 @@ void run() {
 
           await step2.future;
           try {
-            await db.execute('test').timeout(const Duration(milliseconds: 100));
+            await db.execute('test').timeout(const Duration(seconds: 1));
             throw 'should fail';
           } catch (e) {
             expect(e is TimeoutException, true);
@@ -604,7 +617,8 @@ void run() {
         await db.transaction<dynamic>((_) async {});
       });
 
-      test('concurrent 2', () async {
+      test('should block multiple executes until the transaction completes',
+          () async {
         final db = mockDatabaseFactory.newEmptyDatabase() as MockDatabase;
         final step1 = Completer<dynamic>();
         final step2 = Completer<dynamic>();
@@ -613,7 +627,7 @@ void run() {
         Future<void> action1() async {
           await step1.future;
           try {
-            await db.execute('test').timeout(const Duration(milliseconds: 100));
+            await db.execute('test').timeout(const Duration(seconds: 1));
             throw 'should fail';
           } catch (e) {
             expect(e is TimeoutException, true);
@@ -621,7 +635,7 @@ void run() {
 
           await step2.future;
           try {
-            await db.execute('test').timeout(const Duration(milliseconds: 100));
+            await db.execute('test').timeout(const Duration(seconds: 1));
             throw 'should fail';
           } catch (e) {
             expect(e is TimeoutException, true);
@@ -654,7 +668,7 @@ void run() {
     });
 
     group('batch', () {
-      test('simple', () async {
+      test('should wrap each commit in its own transaction', () async {
         final db = await mockDatabaseFactory.openDatabase('batch_simple.db')
             as MockDatabase;
 
@@ -685,7 +699,7 @@ void run() {
         ]);
       });
 
-      test('in_transaction', () async {
+      test('should apply a batch within the current transaction', () async {
         final db = await mockDatabaseFactory
             .openDatabase('batch_in_transaction.db') as MockDatabase;
 
@@ -711,7 +725,8 @@ void run() {
     });
 
     group('instances', () {
-      test('singleInstance same', () async {
+      test('should reuse the same instance for concurrent single instance '
+          'opens', () async {
         final futureDb1 = mockDatabaseFactory.openDatabase('test',
             options: OpenDatabaseOptions(singleInstance: true));
         final db2 = await mockDatabaseFactory.openDatabase('test',
@@ -719,7 +734,8 @@ void run() {
         final db1 = await futureDb1 as MockDatabase;
         expect(db1, db2);
       });
-      test('singleInstance', () async {
+      test('should return one instance per path in single instance mode',
+          () async {
         final futureDb1 = mockDatabaseFactory.openDatabase('test',
             options: OpenDatabaseOptions(singleInstance: true));
         final db2 = await mockDatabaseFactory.openDatabase('test',
@@ -737,7 +753,8 @@ void run() {
         await db3.close();
       });
 
-      test('multiInstances', () async {
+      test('should return distinct instances when single instance is disabled',
+          () async {
         final futureDb1 = mockDatabaseFactory.openDatabase('multi_instances.db',
             options: OpenDatabaseOptions(singleInstance: false));
         final db2 = await mockDatabaseFactory.openDatabase('multi_instances.db',
@@ -750,7 +767,8 @@ void run() {
       });
     });
 
-    test('dead lock', () async {
+    test('should warn and timeout when using the database inside its own '
+        'transaction', () async {
       final db = mockDatabaseFactory.newEmptyDatabase() as MockDatabase;
       var hasTimedOut = false;
       var callbackCount = 0;
@@ -763,7 +781,7 @@ void run() {
         await db.transaction((Transaction txn) async {
           await db.execute('test');
           fail('should fail');
-        }).timeout(const Duration(milliseconds: 500));
+        }).timeout(const Duration(seconds: 2));
       } on TimeoutException catch (_) {
         hasTimedOut = true;
       }
@@ -772,7 +790,7 @@ void run() {
       await db.close();
     });
 
-    test('deleted/exists', () async {
+    test('should delete a database and report its existence', () async {
       const path = 'test_exists.db';
       await mockDatabaseFactory.deleteDatabase(path);
       final exists = await mockDatabaseFactory.databaseExists(path);

@@ -101,10 +101,18 @@ class _TestPageState extends State<TestPage> with Group {
 
   List<Item> items = [];
 
+  // 整组自动运行的执行体（null = 尚未启动过）
+  Future? _groupFuture;
+
+  // 整组运行中标记（防重入：连点刷新按钮不会并行跑两组）
+  bool _groupRunning = false;
+
   Future _run() async {
-    if (!mounted) {
+    if (_groupRunning || !mounted) {
       return null;
     }
+    _groupRunning = true;
+    try {
 
     setState(() {
       items.clear();
@@ -139,6 +147,9 @@ class _TestPageState extends State<TestPage> with Group {
         items[position] = item;
       });
     }
+    } finally {
+      _groupRunning = false;
+    }
   }
 
   Future _runTest(int index) async {
@@ -152,6 +163,16 @@ class _TestPageState extends State<TestPage> with Group {
     setState(() {
       item.state = ItemState.running;
     });
+    // initState 自动整组 _run 可能仍在执行：两个实例并发操作同一数据库文件时，
+    // 后启动实例的 initDeleteDb（deleteDatabase 先关已打开实例，对齐 Android 语义）
+    // 会关闭对方刚打开的库，导致对方 database_closed。先等整组结束再跑手点用例。
+    final group = _groupFuture;
+    if (group != null) {
+      await group;
+      if (!mounted) {
+        return null;
+      }
+    }
     try {
       print('TEST Running ${test.name}');
       await test.fn();
@@ -183,7 +204,7 @@ class _TestPageState extends State<TestPage> with Group {
       _itemCount = 3;
     });
     */
-    _run();
+    _groupFuture = _run();
   }
 
   @override

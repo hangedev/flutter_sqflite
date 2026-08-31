@@ -21,7 +21,7 @@ dependencies:
     git:
       url: "https://gitcode.com/CPF-Flutter/flutter_sqflite.git"
       # ref: 请根据下方TAG版本对应表选择TAG
-      ref: 2.2.8-ohos-1.0.0 
+      ref: TAG # 根据下方表格选择不同框架适配的TAG版本 
       path: sqflite
 ```
 
@@ -35,10 +35,10 @@ flutter pub get
 
 | Flutter 框架版本 | TAG                | 分支             |
 |--------------|--------------------|----------------|
-| 3.7          | 2.2.8-ohos-1.0.0   | master         |
-| 3.22         | 2.2.8-ohos-1.0.0   | master         |
-| 3.27         | 2.4.2-ohos-1.0.0   | br_v2.4.2_ohos |
-| 3.35         | 2.4.2-ohos-1.0.0   | br_v2.4.2_ohos |
+| 3.7          | 2.2.8-ohos-1.0.1   | master         |
+| 3.22         | 2.2.8-ohos-1.0.1   | master         |
+| 3.27         | 2.4.2-ohos-1.0.1   | br_v2.4.2_ohos |
+| 3.35         | 2.4.2-ohos-1.0.1   | br_v2.4.2_ohos |
 
 ## 约束与限制
 
@@ -46,8 +46,8 @@ flutter pub get
 
 在以下版本中已测试通过：
 
-- Flutter: 3.7.12-ohos-1.0.6; DevEco Studio: 5.0.13.200; SDK: 5.0.0(12); ROM: 5.1.0.120 SP3;
-- Flutter: oh-3.22.0-dev; DevEco Studio: 6.1.1.280; SDK: 5.0.0(12); ROM: 5.1.0.53 SP3;
+- Flutter: 3.7.12-ohos-1.0.6; DevEco Studio: 5.0.13.200; SDK: 5.0.5(17); ROM: 5.1.0.120 SP3;
+- Flutter: oh-3.22.0-dev; DevEco Studio: 6.1.1.280; SDK: 5.0.5(17); ROM: 5.1.0.53 SP3;
 
 ### 权限要求
 
@@ -391,6 +391,7 @@ OpenHarmony 适配版本依赖 GitCode 仓库地址。若项目已使用 pub.dev
 ## 遗留问题
 
 - [ ] OpenHarmony 查询返回数据量特别大时，受 taskPool 限制，可能导致序列化失败，无法正常返回数据。参见 [issue #75](https://gitcode.com/CPF-Flutter/flutter_sqflite/issues/75)。
+- [ ] SQL 参数绑定不支持超过 2^53 的整数（BigInt）：OpenHarmony `relationalStore` 的绑定参数类型 `ValueType` 仅含 `number | string | boolean`（无 bigint/long），|v| > 2^53 的 BigInt 参数会被转为字符串按 TEXT 绑定（INTEGER 亲和性列仍会存为整数，读回为 number；TEXT 列则读回 string，与 Android 的 long 绑定存在差异）。查询方向已做 int64 BigInt 保真，不受此限制影响。
 
 ## 目录结构
 ```

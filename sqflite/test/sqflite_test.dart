@@ -2,7 +2,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite/sqflite.dart';
 
-import 'src_mixin_test.dart' show MockDatabaseFactoryEmpty, MockInvalidFactory;
+import 'src/src_mixin_test.dart' show MockDatabaseFactoryEmpty, MockInvalidFactory;
 
 T? _ambiguate<T>(T? value) => value;
 void main() {
@@ -26,7 +26,8 @@ void main() {
       log.clear();
     });
 
-    test('setDebugModeOn', () async {
+    test('should turn on the debug mode through the method channel',
+        () async {
       // ignore: deprecated_member_use_from_same_package
       await Sqflite.setDebugModeOn();
       expect(log.first.method, 'debugMode');
@@ -34,7 +35,7 @@ void main() {
     });
 
     // Check that public api are exported
-    test('exported', () {
+    test('should export the public api surface', () {
       for (var value in <dynamic>[
         // Not part of sqflite_api
         openDatabase,
@@ -63,7 +64,7 @@ void main() {
       }
     });
 
-    test('firstIntValue', () {
+    test('should read the first int value of a query result', () {
       expect(
           Sqflite.firstIntValue(<Map<String, Object?>>[
             <String, Object?>{'test': 1}
@@ -87,7 +88,7 @@ void main() {
           isNull);
     });
 
-    test('hex', () {
+    test('should format bytes as an hexadecimal string', () {
       expect(
           Sqflite.hex(<int>[
             0,
@@ -125,19 +126,7 @@ void main() {
       } on FormatException catch (_) {}
     });
 
-    /*
-    test('open null', () async {
-      AssertionError? exception;
-      try {
-        await openDatabase(null!);
-      } on AssertionError catch (e) {
-        exception = e;
-      }
-      expect(exception, isNotNull);
-    });
-     */
-
-    test('databaseFactory', () {
+    test('should allow changing the default database factory', () {
       final originalDefaultFactory = databaseFactory;
       try {
         databaseFactory = null;
