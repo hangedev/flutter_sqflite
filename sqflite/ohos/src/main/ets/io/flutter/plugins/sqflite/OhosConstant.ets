@@ -43,7 +43,7 @@ export class Constant {
   static PARAM_SQL: string = "sql";
   static PARAM_SQL_ARGUMENTS: string = "arguments";
   static PARAM_NO_RESULT: string = "noResult";
-  static PARAM_CONTINUE_OR_ERROR: string = "continueOnError";
+  static PARAM_CONTINUE_ON_ERROR: string = "continueOnError";
   static PARAM_COLUMNS: string = "columns";
   static PARAM_ROWS: string = "rows";
   // For query to use a cursor.Integer.
@@ -88,8 +88,14 @@ export class Constant {
   static ERROR_BAD_PARAM: string = "bad_param"; // internal only
   static ERROR_OPEN_FAILED: string = "open_failed"; // msg
   static ERROR_DATABASE_CLOSED: string = "database_closed"; // msg
+  // 日志级别，与 Dart 侧 sqfliteLogLevel* 对齐（sqflite_common/lib/src/constant.dart）
+  static LOG_LEVEL_NONE: number = 0;
+  static LOG_LEVEL_SQL: number = 1;
+  static LOG_LEVEL_VERBOSE: number = 2;
   // memory database path
   static MEMORY_DATABASE_PATH: string = ":memory:";
+  // 内存库临时文件名前缀（RdbStore 不支持 :memory:，转为 temp_memory_<时间戳>.db 临时库）
+  static MEMORY_DB_TEMP_PREFIX: string = 'temp_memory_';
   static SQL_BEGIN_IMMEDIATE: string = "BEGIN IMMEDIATE";
   static SQL_COMMIT: string = "COMMIT";
   static SQL_ROLLBACK: string = "ROLLBACK";
@@ -102,6 +108,7 @@ export class Constant {
   static DB_PATH_PARSING_BEGIN_INDEX = 6;
   static RDB_ERROR_CODE_801 = 801;
   static RDB_ERROR_CODE_14800000 = 14800000;
+  static RDB_ERROR_CODE_14800011 = 14800011;
   static RDB_ERROR_CODE_14800021 = 14800021;
   static RDB_ERROR_CODE_14800032 = 14800032;
   static SQLITE_CONSTRAINT_UNIQUE = 2067;

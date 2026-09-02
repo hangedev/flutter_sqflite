@@ -21,7 +21,7 @@ dependencies:
     git:
       url: "https://gitcode.com/CPF-Flutter/flutter_sqflite.git"
       # ref: Please select the TAG to the TAG Version Mapping
-      ref: 2.2.8-ohos-1.0.0   
+      ref: TAG # Select the TAG version that matches your Flutter framework version from the table below     
       path: sqflite
 ```
 
@@ -35,10 +35,10 @@ flutter pub get
 
 | Flutter Framework Version | TAG               | Branch         |
 |---------------------------|-------------------|----------------|
-| 3.7                       | 2.2.8-ohos-1.0.0  | master         |
-| 3.22                      | 2.2.8-ohos-1.0.0  | master         |
-| 3.27                      | 2.4.2-ohos-1.0.0  | br_v2.4.2_ohos |
-| 3.35                      | 2.4.2-ohos-1.0.0  | br_v2.4.2_ohos |
+| 3.7                       | 2.2.8-ohos-1.0.1  | master         |
+| 3.22                      | 2.2.8-ohos-1.0.1  | master         |
+| 3.27                      | 2.4.2-ohos-1.0.1  | br_v2.4.2_ohos |
+| 3.35                      | 2.4.2-ohos-1.0.1  | br_v2.4.2_ohos |
 
 ## Constraints
 
@@ -46,8 +46,8 @@ flutter pub get
 
 This document is verified based on the following versions:
 
-1. Flutter: 3.7.12-ohos-1.0.6; SDK: 5.0.0(12); IDE: DevEco Studio: 5.0.13.200; ROM: 5.1.0.120 SP3;
-2. Flutter: oh-3.22.0-dev; SDK: 5.0.0(12); DevEco Studio: 6.1.1.280; ROM: 5.1.0.53 SP3;
+- Flutter: 3.7.12-ohos-1.0.6; DevEco Studio: 5.0.13.200; SDK: 5.0.5(17); ROM: 5.1.0.120 SP3;
+- Flutter: oh-3.22.0-dev; DevEco Studio: 6.1.1.280; SDK: 5.0.5(17); ROM: 5.1.0.53 SP3;
 
 ### **Permission Requirements**
 
@@ -380,6 +380,7 @@ Inherited from [DatabaseExecutor](#databaseexecutortransaction), repeated method
 ## Known Issues
 
 - [ ]  ohos  When query results contain excessively large datasets, serialization failures occur due to taskPool limitations, preventing normal data return. : [issue#75](https://gitcode.com/CPF-Flutter/flutter_sqflite/issues/75).
+- [ ]  SQL argument binding does not support integers beyond 2^53 (BigInt): the OpenHarmony `relationalStore` binding type `ValueType` only accepts `number | string | boolean` (no bigint/long), so a BigInt argument with |v| > 2^53 is converted to a string and bound as TEXT (columns with INTEGER affinity still store it as an integer and read back as number; TEXT columns read back as string, unlike Android's long binding). Reading int64 values back as BigInt is supported and not affected.
 
 ## Directory Structure
 ```

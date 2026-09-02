@@ -76,6 +76,20 @@ export default class SqflitePlugin implements FlutterPlugin {
       };
       this.sqfliteWorker.onerror = (e: ErrorEvent): void => {
         Log.e('SqflitePlugin', 'SqfliteWorker error: ' + e.message);
+        // worker 异常终止后不会再有任何回执：对 pending 中的在途请求统一回 null 并清空，
+        // 避免这些 seq 在 detach 前永久残留、Dart 侧请求永久挂起（每条 message 必有回执的引擎契约）。
+        this.pending.forEach((reply: BinaryReply) => {
+          try {
+            reply.reply(null);
+          } catch (err) {
+            // ignore：worker 崩溃常伴随引擎侧异常，reply 可能已失效。
+          }
+        });
+        this.pending.clear();
+        // worker 线程异常终止后不会再处理消息：置空引用让后续消息走
+        // rawHandler 的 null 检查直接回 null（MissingPluginException），
+        // 避免 postMessage 到已死线程产生新的挂起；重新 attach 时会重建 worker。
+        this.sqfliteWorker = null;
       };
     }
 
@@ -126,8 +140,18 @@ export default class SqflitePlugin implements FlutterPlugin {
       }
     });
     this.pending.clear();
-    this.sqfliteWorker?.terminate();
+    // terminate() 为同步 void（@ohos.worker.d.ts）：内部仍可能抛异常（worker 已销毁等），加防护避免 detach 流程中断
+    if (this.sqfliteWorker != null) {
+      try {
+        this.sqfliteWorker.terminate();
+      } catch (e) {
+        Log.e('SqflitePlugin', 'terminate worker on detach failed: ' + e);
+      }
+    }
     this.sqfliteWorker = null;
+    // 置空 engine 侧对象引用：detach 后插件实例不再持有 context/messenger，避免延长其生命周期
+    this.context = null;
+    this.messenger = null;
   }
 }
 
