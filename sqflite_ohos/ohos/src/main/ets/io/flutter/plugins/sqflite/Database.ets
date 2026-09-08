@@ -811,7 +811,10 @@ export class Database {
         if (valueBig > Number.MAX_SAFE_INTEGER || valueBig < Number.MIN_SAFE_INTEGER) {
           return valueBig;
         } else {
-          return Number.parseInt(valueBig.toString());
+          // 对齐 dev 分支:安全范围内回退 getValue 按存储类型取值。
+          // getString 对 DOUBLE 列会丢精度(官方文档明示),REAL 值 -1.1 会被取整成 '-1',
+          // 在此 parseInt 会把 -1.1 误读成 -1(整数不受影响,real 测试失败)。
+          return cursor.getValue(index);
         }
       }
     }

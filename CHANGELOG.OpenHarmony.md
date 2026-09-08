@@ -14,6 +14,8 @@
 * OHOS: fixed premature null replies on async error paths; a failed `ROLLBACK` is now reported as an error instead of silently succeeding.
 * OHOS: hardened error paths around reply routing and database close, preventing unhandled rejections during engine teardown; removed dead code (`debugMode` argument, `SqlCommand.toValue`, `OperationRunnable`).
 * OHOS: `VACUUM` is no longer misreported as a `syntax error`. VACUUM statements are now intercepted by a new `VacuumHandler` in the SQL handler chain and guarded in the `execute`/`rawQuery` paths, attempting a real `executeSql` first and returning an explicit `VACUUM is not supported on this platform (OpenHarmony RDB)` error when the RDB engine rejects it.
+* OHOS: REAL/double values are read back losslessly again. The RDB `ResultSet.getString()` used for integer detection loses precision on DOUBLE columns (per the OHOS docs), so an integral-looking string such as `-1` (for a stored `-1.1`) was parsed with `parseInt` and truncated the value to an int. Values within the safe integer range now fall back to `ResultSet.getValue()`, which returns the value by its actual stored type (restores the br_v2.4.1_ohos fix 5e0c9f5 that was lost when merging master).
+* Example (Multiple databases page): "Count record" no longer fails silently after "Delete database". The page kept querying through its stale pre-delete database handle whose id the native side had already cleaned up, so the query failed with `database_closed` and no result was shown. The page now releases the old handle after deleting; the next count re-opens the recreated database (returning 0 records).
 
 ## 2.4.2-ohos-1.0.0
 
