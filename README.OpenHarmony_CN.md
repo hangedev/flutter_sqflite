@@ -82,6 +82,7 @@ dependencies:
 3. 升级前请查阅 [CHANGELOG.OpenHarmony.md](./CHANGELOG.OpenHarmony.md) 了解目标版本的行为变更。从 2.2.x 升级到 2.4.x 的主要 OHOS 变化：
    * 平台通道处理从 UI 线程迁移到后台 worker：大批量插入不再触发 `THREAD_BLOCK_6S` 应用冻结（issue #45、#65），大结果集查询不再受 SharedBlock 2MB 传输上限限制（issue #75）。
    * `VACUUM` 不再被误报为 `syntax error`：RDB 引擎会尝试真实执行，被拒绝时返回明确的“平台不支持（OpenHarmony RDB）”错误。若代码中依赖 `VACUUM`，请显式处理该错误。
+   * REAL 列数值恢复无损读取：此前一处查询侧回归会把 `-1.1` 之类的 double 截断为 `-1`（读回 int），根因是 RDB 的 `getString()` 对 DOUBLE 列会丢精度。若曾为此做过二次解析的兼容处理，升级后可移除。另请注意：`databaseFactory.deleteDatabase` 会在原生侧关闭数据库，应用侧仍持有的 `Database` 句柄将失效（再使用时报 `database_closed`）——请丢弃旧句柄后重新打开，与 Android/iOS 行为一致。
 4. Dart API 与上游 sqflite 保持兼容（2.2.x → 2.4.x 仅新增 `queryCursor` 等接口），除依赖 `ref` 外应用代码无需修改。升级后请重新运行数据库相关测试。
 
 ## 约束与限制

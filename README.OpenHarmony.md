@@ -82,6 +82,7 @@ dependencies:
 3. Review the behavioral changes shipped in the target release in [CHANGELOG.OpenHarmony.md](./CHANGELOG.OpenHarmony.md). Notable OHOS changes when moving from 2.2.x to 2.4.x:
    * Platform-channel handling moved off the UI thread onto a background worker: large batch inserts no longer trigger `THREAD_BLOCK_6S` appfreeze (issues #45, #65) and large result sets are no longer limited by the SharedBlock 2MB transfer cap (issue #75).
    * `VACUUM` is no longer misreported as a `syntax error`; the RDB engine attempts a real execution and returns an explicit "not supported on this platform (OpenHarmony RDB)" error when it rejects the statement. If your code relied on `VACUUM`, handle this error explicitly.
+   * REAL column values are read back losslessly: a query-side regression truncated doubles such as `-1.1` to `-1` (returned as int) because the RDB `getString()` loses precision on DOUBLE columns. If you added a re-parsing workaround for this, remove it after upgrading. Note that `databaseFactory.deleteDatabase` closes the database on the native side, so any `Database` handles you still hold become invalid (`database_closed` on next use) — drop them and re-open, matching Android/iOS behavior.
 4. The Dart API surface stays compatible with upstream sqflite (2.2.x → 2.4.x adds new APIs such as `queryCursor`); existing application code needs no change apart from the dependency `ref`. Re-run your database tests after upgrading.
 
 ## Constraints

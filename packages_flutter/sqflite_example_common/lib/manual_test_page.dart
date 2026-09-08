@@ -1,3 +1,4 @@
+import 'dart:io' as ISPlatform;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -395,6 +396,12 @@ class _SimpleDbTestPageState extends State<SimpleDbTestPage> {
             }),
             menuItem('Delete database', () async {
               await databaseFactory.deleteDatabase(widget.dbName);
+              // ohos 原生删除数据库时已按 path 关闭并清理映射，
+              // 页面持有的旧 db 引用需一并释放置空，否则后续
+              // count record 复用旧 dbId 会收到 database_closed 错误。
+              if (ISPlatform.Platform.operatingSystem == 'ohos') {
+                await _closeDatabase();
+              }
             }),
           ];
           return ListView(children: items);
