@@ -12,6 +12,8 @@ Future main() async {
     'sqflite_android',
     'sqflite_platform_interface',
     join('packages', 'console_test_app'),
+    join('packages', 'sqflite_common_ffi_async'),
+    join('packages', 'sqflite_common_ffi_async_test'),
     join('packages_flutter', 'sqflite_example_common'),
   ]) {
     await packageRunCi(join('..', dir));
@@ -20,7 +22,9 @@ Future main() async {
   // These projects perform build in their test and sometimes fails, at least
   // more frequently that the other standard format/analyze/test.
   for (var dir in ['sqflite_support', 'sqflite_test_app']) {
-    await packageRunCi(join('..', dir),
-        options: PackageRunCiOptions(noTest: true));
+    await packageRunCi(
+      join('..', dir),
+      options: PackageRunCiOptions(noTest: true),
+    );
   }
 }

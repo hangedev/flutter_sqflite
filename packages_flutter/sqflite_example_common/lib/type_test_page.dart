@@ -306,7 +306,8 @@ class TypeTestPage extends TestPage {
           // this happens on the web
           failed = true;
         }
-        if (supportsCompatMode || defaultTargetPlatform == TargetPlatform.ohos) {
+        if (supportsCompatMode ||
+            defaultTargetPlatform == TargetPlatform.ohos) {
           print('for now bool are accepted but inconsistent on iOS/Android');
           expect(failed, isFalse);
         }

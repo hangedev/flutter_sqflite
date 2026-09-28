@@ -108,8 +108,12 @@ abstract class DatabaseException implements Exception {
 /// Exception implementation
 class SqfliteDatabaseException extends DatabaseException {
   /// ctor with a message and some data
-  SqfliteDatabaseException(super.message, this.result,
-      {int? resultCode, bool? transactionClosed}) {
+  SqfliteDatabaseException(
+    super.message,
+    this.result, {
+    int? resultCode,
+    bool? transactionClosed,
+  }) {
     _resultCode = resultCode;
     _transactionClosed = transactionClosed;
   }
@@ -154,46 +158,46 @@ class SqfliteDatabaseException extends DatabaseException {
   /// The application should handle both.
   @override
   int? getResultCode() => _resultCode ??= () {
-        final message = _message!.toLowerCase();
-        int? findCode(String patternPrefix) {
-          final index = message.indexOf(patternPrefix);
-          if (index != -1) {
-            try {
-              // Split at first space
-              var code = message
-                  .substring(index + patternPrefix.length)
-                  .trim()
-                  .split(' ')[0];
-              // Find ending parenthesis if any
-              final endIndex = code.indexOf(')');
-              if (endIndex != -1) {
-                code = code.substring(0, endIndex);
-              }
-
-              final resultCode = int.tryParse(code);
-              if (resultCode != null) {
-                return resultCode;
-              }
-            } catch (_) {}
+    final message = _message!.toLowerCase();
+    int? findCode(String patternPrefix) {
+      final index = message.indexOf(patternPrefix);
+      if (index != -1) {
+        try {
+          // Split at first space
+          var code = message
+              .substring(index + patternPrefix.length)
+              .trim()
+              .split(' ')[0];
+          // Find ending parenthesis if any
+          final endIndex = code.indexOf(')');
+          if (endIndex != -1) {
+            code = code.substring(0, endIndex);
           }
-          return null;
-        }
 
-        var code = findCode('(sqlite code ');
-        if (code != null) {
-          return code;
-        }
-        code = findCode('(code ');
-        if (code != null) {
-          return code;
-        }
-        // ios
-        code = findCode('code=');
-        if (code != null) {
-          return code;
-        }
-        return null;
-      }();
+          final resultCode = int.tryParse(code);
+          if (resultCode != null) {
+            return resultCode;
+          }
+        } catch (_) {}
+      }
+      return null;
+    }
+
+    var code = findCode('(sqlite code ');
+    if (code != null) {
+      return code;
+    }
+    code = findCode('(code ');
+    if (code != null) {
+      return code;
+    }
+    // ios
+    code = findCode('code=');
+    if (code != null) {
+      return code;
+    }
+    return null;
+  }();
 
   /// True if the current transaction has been rolled back in the execution
   bool get transactionClosed => _transactionClosed ?? false;

@@ -2,7 +2,7 @@
   <h1 align="center">sqflite</h1>
 </p>
 
-本项目基于 [sqflite@2.4.2](https://pub.dev/packages/sqflite/versions/2.4.2) 开发。
+本项目基于 [sqflite@2.4.2+1](https://pub.dev/packages/sqflite/versions/2.4.2+1) 开发。
 
 ## 简介
 
@@ -62,10 +62,12 @@ flutter pub get
 | 3.22         | 2.2.8-ohos-1.0.0   | master           |
 | 3.27         | 2.4.2-ohos-1.0.1   | br_v2.4.2_ohos   |
 | 3.35         | 2.4.2-ohos-1.0.1   | br_v2.4.2_ohos   |
+| 3.41         | 2.4.2_1-ohos-1.0.0 | br_3.41_dev      |
+| 3.44         | 2.4.2_1-ohos-1.0.0 | br_3.41_dev      |
 
 ### 升级迁移
 
-从旧的 OpenHarmony 适配版本（如基于上游 sqflite 2.2.8 的 `2.2.8-ohos-1.0.0`）升级到当前 `2.4.2-ohos-1.0.1`（基于上游 sqflite 2.4.2）的步骤：
+从旧的 OpenHarmony 适配版本（如基于上游 sqflite 2.2.8 的 `2.2.8-ohos-1.0.0`）升级到当前 `2.4.2_1-ohos-1.0.0`（基于上游 sqflite 2.4.2+1）的步骤：
 
 1. 修改 pubspec.yaml 中依赖的 `ref` 为目标 TAG，然后执行 `flutter pub get`：
 
@@ -74,11 +76,11 @@ dependencies:
   sqflite:
     git:
       url: "https://gitcode.com/CPF-Flutter/flutter_sqflite.git"
-      ref: 2.4.2-ohos-1.0.1
+      ref: 2.4.2_1-ohos-1.0.0
       path: sqflite
 ```
 
-2. 框架版本需与 TAG 匹配：`2.4.2-ohos-1.0.1` 要求 Flutter 3.27 / 3.35 的 ohos 发行版（见上方 TAG 版本对应表及[兼容性](#兼容性)）；跨大版本升级框架时，还需同步升级配套的 DevEco Studio / OH SDK 工具链。
+2. 框架版本需与 TAG 匹配：`2.4.2_1-ohos-1.0.0` 要求 Flutter 3.41 / 3.44 的 ohos 发行版（Dart ^3.10.0，随上游要求；见上方 TAG 版本对应表及[兼容性](#兼容性)）；跨大版本升级框架时，还需同步升级配套的 DevEco Studio / OH SDK 工具链。
 3. 升级前请查阅 [CHANGELOG.OpenHarmony.md](./CHANGELOG.OpenHarmony.md) 了解目标版本的行为变更。从 2.2.x 升级到 2.4.x 的主要 OHOS 变化：
    * 平台通道处理从 UI 线程迁移到后台 worker：大批量插入不再触发 `THREAD_BLOCK_6S` 应用冻结（issue #45、#65），大结果集查询不再受 SharedBlock 2MB 传输上限限制（issue #75）。
    * `VACUUM` 不再被误报为 `syntax error`：RDB 引擎会尝试真实执行，被拒绝时返回明确的“平台不支持（OpenHarmony RDB）”错误。若代码中依赖 `VACUUM`，请显式处理该错误。
@@ -91,8 +93,8 @@ dependencies:
 
 在以下版本中已测试通过：
 
-1. Flutter: 3.27.5-ohos-0.0.1; SDK: 5.0.5(17); IDE: DevEco Studio: 5.1.0.828; ROM: 5.1.0.130 SP8;
-2. Flutter: 3.35.8-ohos-0.0.1; SDK: 5.0.5(17); IDE: DevEco Studio: 6.0.2.640; ROM: 6.0.0.328 SP22;
+1. Flutter: 3.41.10-ohos-1.0.0; SDK: 5.0.5(17); IDE: DevEco Studio: 6.1.1.268; ROM: 6.0.0.130 SP25;
+2. Flutter: 3.44.9+ohos-0.0.1-canary1; SDK: 5.0.5(17); IDE: DevEco Studio: 6.1.1.290; ROM: 6.0.0.130 SP25;
 
 ### 权限要求
 
@@ -102,6 +104,7 @@ dependencies:
 
 1. **BigInt 参数以 TEXT 落库（SDK API ≥ 20）**：超出 `Number.MAX_SAFE_INTEGER` 的整数参数会以字符串绑定（规避 RDB bigint 绑定缺陷的折中方案），落库类型为 TEXT 而非 INTEGER，回读为 `string`/`BigInt` 而非 `number`。此类列不具备整数语义：`ORDER BY`、比较、聚合均按文本规则处理（如 `'10' < '9'`），且 TEXT 值与 INTEGER 值做 `=` 比较恒不相等。请将该列按文本处理，或读出后自行转换数值。
 
+2. **`Database.setJournalMode()` 不受支持**：该接口（随上游 `sqflite_common 2.5.6+1` 引入）执行 `PRAGMA journal_mode = X`，OHOS RDB 引擎在 execute 与 query 两条路径上均会拒绝，调用必然抛出 `DatabaseException(syntax error)`。journal mode 由 OHOS RDB 组件内部管理：应用侧既无法查询当前模式（`PRAGMA journal_mode` 同样被拒），也无法可靠切换（紧凑式 `PRAGMA journal_mode=WAL` 不报错，但效果无法验证）。OHOS 上请勿调用 `setJournalMode`；日志模式及其并发特性由系统 RDB 决定，不受应用控制。
 
 ## 使用示例
 

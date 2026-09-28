@@ -1,3 +1,12 @@
+## 2.5.6+1
+
+* Requires dart 3.10
+
+## 2.5.6
+
+* Add `Database.setJournalMode` extension helper method.
+* Requires dart 3.8
+
 ## 2.5.5
 
 * Requires dart 3.7

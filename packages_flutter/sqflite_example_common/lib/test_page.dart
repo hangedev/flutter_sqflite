@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:meta/meta.dart';
+import 'package:sqflite_common/sqflite.dart';
+import 'package:sqflite_common/sqflite_dev.dart';
 import 'package:sqflite_example_common/src/common_import.dart';
 import 'package:sqflite_example_common/src/expect.dart';
 
@@ -28,6 +31,13 @@ class TestPage extends StatefulWidget {
   /// define a test.
   void test(String name, FutureOr Function() fn) {
     tests.add(Test(name, fn));
+  }
+
+  @doNotSubmit
+  /// Enable extra debug when needed
+  Future<void> enableDebug() async {
+    // ignore: deprecated_member_use
+    await databaseFactory.setLogLevel(sqfliteLogLevelVerbose);
   }
 
   /// define a solo test.
@@ -122,9 +132,10 @@ class _TestPageState extends State<TestPage> with Group {
         items.add(item);
       });
       try {
-        await test.fn();
+        var result = await test.fn();
 
-        item = Item(test.name)..state = ItemState.success;
+        item = Item(test.name)
+          ..state = result == false ? ItemState.warning : ItemState.success;
       } catch (e, st) {
         print(e);
         print(st);
@@ -154,10 +165,11 @@ class _TestPageState extends State<TestPage> with Group {
     });
     try {
       print('TEST Running ${test.name}');
-      await test.fn();
+      var result = await test.fn();
       print('TEST Done ${test.name}');
 
-      item = Item(test.name)..state = ItemState.success;
+      item = Item(test.name)
+        ..state = (result == false) ? ItemState.warning : ItemState.success;
     } catch (e, st) {
       print('TEST Error $e running ${test.name}');
       try {
@@ -189,15 +201,18 @@ class _TestPageState extends State<TestPage> with Group {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(title: Text(widget.title), actions: <Widget>[
+      appBar: AppBar(
+        title: Text(widget.title),
+        actions: <Widget>[
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Run again',
             onPressed: _run,
           ),
-        ]),
-        body:
-            ListView.builder(itemBuilder: _itemBuilder, itemCount: _itemCount));
+        ],
+      ),
+      body: ListView.builder(itemBuilder: _itemBuilder, itemCount: _itemCount),
+    );
   }
 
   Widget _itemBuilder(BuildContext context, int index) {

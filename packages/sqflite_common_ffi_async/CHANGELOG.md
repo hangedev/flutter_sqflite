@@ -1,3 +1,18 @@
+## 0.2.0
+
+* Requires `sqlite_async: ^0.14.0`
+* Requires dart 3.11
+* supports sqlite3 v3
+
+## 0.1.4+1
+
+* Requires dart 3.10
+* sqflite_async "<0.14.0"
+
+## 0.1.4
+
+* Requires dart 3.7
+
 ## 0.1.3+1
 
 * Remove dependency on `dart:html`

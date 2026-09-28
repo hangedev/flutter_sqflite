@@ -35,8 +35,11 @@ Future<void> runMacOS() async {
 
 /// Find the first iOS device id
 Future<String> findFirstIOSDeviceId() async {
-  var list = jsonDecode(
-      (await run('flutter devices --machine', verbose: false)).outText) as List;
+  var list =
+      jsonDecode(
+            (await run('flutter devices --machine', verbose: false)).outText,
+          )
+          as List;
   // "name": "iPhone 15 Pro",
   // "id": "1A9A31FE-40DC-4EEB-B464-63BBA43FC943",
   // "isSupported": true,
@@ -54,7 +57,11 @@ Future<String> findFirstIOSDeviceId() async {
 }
 
 /// Run iOS
-Future<void> runIOS() async {
+Future<void> runIOS({bool? release}) async {
+  release ??= false;
   var iosDeviceId = await findFirstIOSDeviceId();
-  await run('flutter run -d $iosDeviceId');
+  await run(
+    'flutter run -d $iosDeviceId'
+    '${release ? ' --release' : ''}',
+  );
 }

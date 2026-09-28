@@ -82,11 +82,14 @@ class _ManualTestPageState extends State<ManualTestPage> {
     db.internalsDoNotUseSynchronized = noSynchronized ?? false;
     await db.transaction((txn) async {
       await txn.execute(
-          'CREATE TABLE IF NOT EXISTS Task(id INTEGER PRIMARY KEY, name TEXT)');
-      await txn.execute('INSERT INTO Task(name) VALUES (?)',
-          ['task ${DateTime.now().toIso8601String()}']);
-      var count =
-          firstIntValue(await txn.query('Task', columns: [sqlCountColumn]));
+        'CREATE TABLE IF NOT EXISTS Task(id INTEGER PRIMARY KEY, name TEXT)',
+      );
+      await txn.execute('INSERT INTO Task(name) VALUES (?)', [
+        'task ${DateTime.now().toIso8601String()}',
+      ]);
+      var count = firstIntValue(
+        await txn.query('Task', columns: [sqlCountColumn]),
+      );
       unawaited(showToast('$count task(s)'));
       if (msDelay != null) {
         await Future<void>.delayed(Duration(milliseconds: msDelay));
@@ -107,9 +110,9 @@ class _ManualTestPageState extends State<ManualTestPage> {
         print('sqlite version: $version');
         await db.close();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('select sqlite_version(): $version'),
-          ));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('select sqlite_version(): $version')),
+          );
         }
       }, summary: 'select sqlite_version()'),
       SqfMenuItem('Factory information', () async {
@@ -195,27 +198,37 @@ class _ManualTestPageState extends State<ManualTestPage> {
         print(await _incrementVersion());
       }, summary: 'Implementation info (dev only)'),
       SqfMenuItem('Multiple db', () async {
-        await Navigator.of(context).push<void>(MaterialPageRoute(builder: (_) {
-          return const MultipleDbTestPage();
-        }));
+        await Navigator.of(context).push<void>(
+          MaterialPageRoute(
+            builder: (_) {
+              return const MultipleDbTestPage();
+            },
+          ),
+        );
       }, summary: 'Open multiple databases'),
-      ...[800000, 1500000, 15000000, 150000000]
-          .map((size) => SqfMenuItem('Big blob $size', () async {
-                await testBigBlog(size);
-              }))
+      ...[800000, 1500000, 15000000, 150000000].map(
+        (size) => SqfMenuItem('Big blob $size', () async {
+          await testBigBlog(size);
+        }),
+      ),
     ];
   }
 
   Future<void> testBigBlog(int size) async {
     // await Sqflite.devSetDebugModeOn(true);
-    var db = await openDatabase(inMemoryDatabasePath, version: 1,
-        onCreate: (Database db, int version) async {
-      await db
-          .execute('CREATE TABLE Test (id INTEGER PRIMARY KEY, value BLOB)');
-    });
+    var db = await openDatabase(
+      inMemoryDatabasePath,
+      version: 1,
+      onCreate: (Database db, int version) async {
+        await db.execute(
+          'CREATE TABLE Test (id INTEGER PRIMARY KEY, value BLOB)',
+        );
+      },
+    );
     try {
-      var blob =
-          Uint8List.fromList(List.generate(size, (index) => index % 256));
+      var blob = Uint8List.fromList(
+        List.generate(size, (index) => index % 256),
+      );
       var id = await db.insert('Test', {'value': blob});
 
       /// Get the value field from a given id
@@ -226,8 +239,9 @@ class _ManualTestPageState extends State<ManualTestPage> {
 
       var ok = (await getValue(id)).length == blob.length;
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('$size: $ok')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$size: $ok')));
       }
     } finally {
       await db.close();
@@ -237,30 +251,24 @@ class _ManualTestPageState extends State<ManualTestPage> {
   @override
   Widget build(BuildContext context) {
     itemWidgets = items
-        .map((item) => ItemWidget(
-              item,
-              (item) async {
-                final stopwatch = Stopwatch()..start();
-                final future = (item as SqfMenuItem).run();
-                setState(() {});
-                await future;
-                // always add a small delay
-                final elapsed = stopwatch.elapsedMilliseconds;
-                if (elapsed < 300) {
-                  await sleep(300 - elapsed);
-                }
-                setState(() {});
-              },
-              summary: item.summary,
-            ))
+        .map(
+          (item) => ItemWidget(item, (item) async {
+            final stopwatch = Stopwatch()..start();
+            final future = (item as SqfMenuItem).run();
+            setState(() {});
+            await future;
+            // always add a small delay
+            final elapsed = stopwatch.elapsedMilliseconds;
+            if (elapsed < 300) {
+              await sleep(300 - elapsed);
+            }
+            setState(() {});
+          }, summary: item.summary),
+        )
         .toList(growable: false);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Manual tests'),
-      ),
-      body: ListView(
-        children: itemWidgets,
-      ),
+      appBar: AppBar(title: const Text('Manual tests')),
+      body: ListView(children: itemWidgets),
     );
   }
 }

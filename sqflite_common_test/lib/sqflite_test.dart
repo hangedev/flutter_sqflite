@@ -111,7 +111,8 @@ mixin SqfliteTestContextMixin implements SqfliteTestContext {
   }
 
   @override
-  Future devSetDebugModeOn(bool on) => databaseFactory
+  Future devSetDebugModeOn(bool on) =>
+      databaseFactory
       // ignore: deprecated_member_use
       .setLogLevel(on ? sqfliteLogLevelVerbose : sqfliteLogLevelNone);
 

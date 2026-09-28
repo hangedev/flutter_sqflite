@@ -1,3 +1,11 @@
+## 2.4.2+1
+
+* Requires dart 3.10
+
+## 2.4.2
+
+* Requires dart 3.7
+
 ## 2.4.1
 
 * Add darwin extension to allow creating unprotected folder in iOS (issue #924)

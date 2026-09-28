@@ -2,6 +2,9 @@ import 'dart:js_interop';
 
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import 'package:sqflite_common_ffi_web/src/constant.dart';
+import 'package:sqflite_common_ffi_web/src/database_factory_web.dart';
+import 'package:sqflite_common_ffi_web/src/import.dart';
+import 'package:sqflite_common_ffi_web/src/sw/constants.dart';
 import 'package:sqlite3/wasm.dart';
 import 'package:web/web.dart' as web;
 
@@ -14,7 +17,8 @@ var _log = print;
 
 /// Load base file system
 Future<SqfliteFfiWebContext> sqfliteFfiWebLoadSqlite3FileSystem(
-    SqfliteFfiWebOptions options) async {
+  SqfliteFfiWebOptions options,
+) async {
   var indexedDbName = options.indexedDbName ?? 'sqflite_databases';
   final fs = await IndexedDbFileSystem.open(dbName: indexedDbName);
   return SqfliteFfiWebContextImpl(options: options, fs: fs);
@@ -27,9 +31,10 @@ var defaultSharedWorkerUri = Uri.parse(sqfliteSharedWorkerJsFile);
 
 /// Default indexedDB name is /sqflite
 Future<SqfliteFfiWebContext> sqfliteFfiWebLoadSqlite3Wasm(
-    SqfliteFfiWebOptions options,
-    {SqfliteFfiWebContext? context,
-    bool? fromWebWorker}) async {
+  SqfliteFfiWebOptions options, {
+  SqfliteFfiWebContext? context,
+  bool? fromWebWorker,
+}) async {
   context ??= await sqfliteFfiWebLoadSqlite3FileSystem(options);
   var uri = options.sqlite3WasmUri ?? _defaultSqlite3WasmUri;
   if (_debug) {
@@ -42,12 +47,16 @@ Future<SqfliteFfiWebContext> sqfliteFfiWebLoadSqlite3Wasm(
   wasmSqlite3.registerVirtualFileSystem(fs, makeDefault: true);
 
   return SqfliteFfiWebContextImpl(
-      options: options, fs: fs, wasmSqlite3: wasmSqlite3);
+    options: options,
+    fs: fs,
+    wasmSqlite3: wasmSqlite3,
+  );
 }
 
 /// Start web worker (from client)
 Future<SqfliteFfiWebContext> sqfliteFfiWebStartSharedWorker(
-    SqfliteFfiWebOptions options) async {
+  SqfliteFfiWebOptions options,
+) async {
   try {
     var name = 'sqflite_common_ffi_web';
     var sharedWorkerUri = options.sharedWorkerUri ?? defaultSharedWorkerUri;
@@ -57,10 +66,13 @@ Future<SqfliteFfiWebContext> sqfliteFfiWebStartSharedWorker(
       if (!(options.forceAsBasicWorker ?? false)) {
         if (_debug) {
           _log(
-              '$_swc registering shared worker $sharedWorkerUri (name: $name)');
+            '$_swc registering shared worker $sharedWorkerUri (name: $name)',
+          );
         }
-        sharedWorker =
-            web.SharedWorker(sharedWorkerUri.toString().toJS, name.toJS);
+        sharedWorker = web.SharedWorker(
+          sharedWorkerUri.toString().toJS,
+          name.toJS,
+        );
       }
     } catch (e) {
       if (_debug) {
@@ -73,8 +85,29 @@ Future<SqfliteFfiWebContext> sqfliteFfiWebStartSharedWorker(
       }
       worker = web.Worker(sharedWorkerUri.toString().toJS);
     }
-    return SqfliteFfiWebContextImpl(
-        options: options, sharedWorker: sharedWorker, worker: worker);
+
+    var context = SqfliteFfiWebContextImpl(
+      options: options,
+      sharedWorker: sharedWorker,
+      worker: worker,
+    );
+
+    /// Send options before any other call
+    if (options.indexedDbName != null ||
+        options.sqlite3WasmUri != null ||
+        options.sharedWorkerUri != null ||
+        options.forceAsBasicWorker != null ||
+        options.inMemory != null) {
+      if (_debug) {
+        _log('$_swc setting options ${options.toMap()}');
+      }
+      var optionsMethodCall = FfiMethodCall(
+        methodSetWebOptions,
+        options.toMap(),
+      );
+      await ffiMethodCallSendToWebWorker(optionsMethodCall, context);
+    }
+    return context;
   } catch (e, st) {
     if (_debug) {
       _log('sqfliteFfiWebLoadSqlite3Wasm failed: $e');
@@ -102,12 +135,13 @@ class SqfliteFfiWebContextImpl extends SqfliteFfiWebContext {
   late final RawMessageSender rawMessageSender;
 
   /// Web implementation with shared worker
-  SqfliteFfiWebContextImpl(
-      {required super.options,
-      this.fs,
-      this.wasmSqlite3,
-      this.sharedWorker,
-      this.worker}) {
+  SqfliteFfiWebContextImpl({
+    required super.options,
+    this.fs,
+    this.wasmSqlite3,
+    this.sharedWorker,
+    this.worker,
+  }) {
     if (sharedWorker != null) {
       rawMessageSender = RawMessageSenderSharedWorker(sharedWorker!);
     }

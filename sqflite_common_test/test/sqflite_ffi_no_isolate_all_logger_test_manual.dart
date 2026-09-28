@@ -3,9 +3,11 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sqflite_common_test/all_test.dart' as all;
 import 'package:sqflite_common_test/sqflite_test.dart';
 
+// ignore: experimental_member_use
 var _factory = SqfliteDatabaseFactoryLogger(
-    createDatabaseFactoryFfi(noIsolate: true),
-    options: SqfliteLoggerOptions(type: SqfliteDatabaseFactoryLoggerType.all));
+  createDatabaseFactoryFfi(noIsolate: true),
+  options: SqfliteLoggerOptions(type: SqfliteDatabaseFactoryLoggerType.all),
+);
 
 class SqfliteFfiNoIsolateTestContext extends SqfliteLocalTestContext {
   SqfliteFfiNoIsolateTestContext() : super(databaseFactory: _factory);
