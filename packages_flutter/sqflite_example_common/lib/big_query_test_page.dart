@@ -333,6 +333,12 @@ class _BigQueryTestPageState extends State<BigQueryTestPage> {
           return '完成';
       }
     }();
+    // While running, the query phases cannot report progress, so the indicator
+    // animates (null); once finished it must freeze to a fixed value instead of
+    // animating forever (seeding interrupted keeps its partial progress).
+    final indicatorValue = _running || _phase == 'seeding'
+        ? (_phase == 'seeding' ? progress : null)
+        : 1.0;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -341,7 +347,7 @@ class _BigQueryTestPageState extends State<BigQueryTestPage> {
           children: [
             Text(phaseText),
             const SizedBox(height: 8),
-            LinearProgressIndicator(value: _phase == 'seeding' ? progress : null),
+            LinearProgressIndicator(value: indicatorValue),
           ],
         ),
       ),
@@ -386,7 +392,10 @@ class _BigQueryTestPageState extends State<BigQueryTestPage> {
   }
 
   Widget _conclusionCard() {
-    if (_plain.success == null && _cursor.success == null) {
+    // Only conclude once BOTH results are in: success is tri-state
+    // (null=running/not run), and an unfinished cursor query must not be
+    // reported as a failure while plain already succeeded.
+    if (_plain.success == null || _cursor.success == null) {
       return const SizedBox.shrink();
     }
     final plainOk = _plain.success == true;
