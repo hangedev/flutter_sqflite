@@ -10,15 +10,20 @@ import 'sqflite_ffi_async_database.dart';
 var factoryFfi = databaseFactoryFfi; //.debugQuickLoggerWrapper();
 
 /// The Ffi database factory.
-var databaseFactoryFfiAsyncImpl =
-    SqfliteDatabaseFactoryFfiAsync(tag: 'ffi_async');
+var databaseFactoryFfiAsyncImpl = SqfliteDatabaseFactoryFfiAsync(
+  tag: 'ffi_async',
+);
 
 /// The Ffi database factory for tests.
-var databaseFactoryFfiAsyncTestImpl =
-    SqfliteDatabaseFactoryFfiAsync(tag: 'ffi_async_test');
+var databaseFactoryFfiAsyncTestImpl = SqfliteDatabaseFactoryFfiAsync(
+  tag: 'ffi_async_test',
+);
 
 /// The Ffi async database factory.
 class SqfliteDatabaseFactoryFfiAsync with SqfliteDatabaseFactoryMixin {
+  /// Allow overriding, use regular ffi otherwise
+  String? _databasesPath;
+
   /// The Ffi async database factory.
   SqfliteDatabaseFactoryFfiAsync({String? tag}) {
     this.tag = tag;
@@ -33,9 +38,15 @@ class SqfliteDatabaseFactoryFfiAsync with SqfliteDatabaseFactoryMixin {
     }
   }
 
+  /// Set the databases path.
   @override
-  Future<String> getDatabasesPath() {
-    return factoryFfi.getDatabasesPath();
+  void setDatabasesPathOrNull(String? path) {
+    _databasesPath = path;
+  }
+
+  @override
+  Future<String> getDatabasesPath() async {
+    return _databasesPath ?? await factoryFfi.getDatabasesPath();
   }
 
   /*
@@ -46,7 +57,9 @@ class SqfliteDatabaseFactoryFfiAsync with SqfliteDatabaseFactoryMixin {
 
   @override
   SqfliteDatabase newDatabase(
-      SqfliteDatabaseOpenHelper openHelper, String path) {
+    SqfliteDatabaseOpenHelper openHelper,
+    String path,
+  ) {
     return SqfliteDatabaseFfiAsync(openHelper, path);
   }
 
@@ -90,8 +103,10 @@ class SqfliteDatabaseFactoryFfiAsync with SqfliteDatabaseFactoryMixin {
   }
 
   @override
-  Future<Database> openDatabase(String path,
-      {OpenDatabaseOptions? options}) async {
+  Future<Database> openDatabase(
+    String path, {
+    OpenDatabaseOptions? options,
+  }) async {
     // Read-only not supported in ffi_async
     if (options?.readOnly ?? false) {
       return await factoryFfi.openDatabase(path, options: options);

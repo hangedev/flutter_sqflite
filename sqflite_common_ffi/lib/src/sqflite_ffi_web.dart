@@ -16,13 +16,17 @@ DatabaseFactory get databaseFactoryFfi => databaseFactoryFfiImpl;
 ///
 /// Currently supports Win/Mac/Linux.
 DatabaseFactory get databaseFactoryFfiNoIsolate => throw UnimplementedError(
-    'databaseFactoryFfiNoIsolate only supported for io application');
+  'databaseFactoryFfiNoIsolate only supported for io application',
+);
 
 /// Creates an FFI database factory
-DatabaseFactory createDatabaseFactoryFfi(
-    {SqfliteFfiInit? ffiInit, bool noIsolate = false}) {
+DatabaseFactory createDatabaseFactoryFfi({
+  SqfliteFfiInit? ffiInit,
+  bool noIsolate = false,
+}) {
   throw UnimplementedError(
-      'createDatabaseFactoryFfi only supported for io application');
+    'createDatabaseFactoryFfi only supported for io application',
+  );
 }
 
 /// Optional. Initialize ffi loader.

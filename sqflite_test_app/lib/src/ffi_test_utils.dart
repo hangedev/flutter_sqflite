@@ -17,8 +17,9 @@ var platformIsMacOS = Platform.isMacOS;
 var isSupported = platformIsWindows || platformIsLinux || platformIsMacOS;
 
 /// Platform
-var platform =
-    platformIsWindows ? 'windows' : (platformIsMacOS ? 'macos' : 'linux');
+var platform = platformIsWindows
+    ? 'windows'
+    : (platformIsMacOS ? 'macos' : 'linux');
 
 var _linuxExeDir = join('build', 'linux', 'x64', 'release', 'bundle');
 var _windowsExeDir = join('build', 'windows', 'runner', 'Release');
@@ -75,7 +76,6 @@ Future<void> createProject(String path, {String? platform}) async {
   await deleteDir(join(path, platform));
   // Create directory
   await Directory(path).create(recursive: true);
-  await shell.run('flutter config --enable-$platform-desktop');
   await shell.run('flutter create --platforms $platform .');
 }
 
@@ -98,8 +98,11 @@ Future<String> getBuildProjectAppFilename(String path) async {
 }
 
 /// Recreate and build a project
-Future<void> buildProject(String path,
-    {String? target, String? platform}) async {
+Future<void> buildProject(
+  String path, {
+  String? target,
+  String? platform,
+}) async {
   var shell = Shell(workingDirectory: path);
   platform ??= buildPlatformCurrent;
   await shell.run('''

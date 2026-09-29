@@ -37,11 +37,14 @@ class DatabaseTracker {
         'file:sqflite_database_tracker?mode=memory&cache=shared',
         uri: true,
       );
-      var tableExists = (_db!
-              .select(
-                  'SELECT COUNT(*) FROM sqlite_master WHERE tbl_name = \'$_tableName\'')
-              .first
-              .columnAt(0) as int) >
+      var tableExists =
+          (_db!
+                  .select(
+                    'SELECT COUNT(*) FROM sqlite_master WHERE tbl_name = \'$_tableName\'',
+                  )
+                  .first
+                  .columnAt(0)
+              as int) >
           0;
       if (!tableExists) {
         _db!.execute('''
@@ -87,7 +90,7 @@ CREATE TABLE IF NOT EXISTS $_tableName (
         for (final row in results) {
           final ptr = Pointer.fromAddress(row.columnAt(0) as int);
           try {
-            sqlite3.fromPointer(ptr).dispose();
+            sqlite3.fromPointer(ptr).close();
           } catch (e) {
             // ignore: avoid_print
             print('error $e disposing $ptr');

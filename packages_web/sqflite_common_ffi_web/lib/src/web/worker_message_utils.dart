@@ -88,8 +88,10 @@ class RawMessageSenderSharedWorker extends RawMessageSender {
 
   @override
   void postMessage(Object message, web.MessagePort responsePort) {
-    _port.postMessage(message.jsifyValueStrict(),
-        messagePortToPortMessageOption(responsePort));
+    _port.postMessage(
+      message.jsifyValueStrict(),
+      messagePortToPortMessageOption(responsePort),
+    );
   }
 
   StreamController<Object>? _errorController;
@@ -97,16 +99,19 @@ class RawMessageSenderSharedWorker extends RawMessageSender {
   Stream<Object> get onError {
     if (_errorController == null) {
       var zone = Zone.current;
-      _errorController = StreamController<Object>.broadcast(onListen: () {
-        _sharedWorker.onerror = (web.Event event) {
-          zone.run(() {
-            _errorController!.add(event);
-          });
-        }.toJS;
-      }, onCancel: () {
-        _errorController = null;
-        _sharedWorker.onerror = null;
-      });
+      _errorController = StreamController<Object>.broadcast(
+        onListen: () {
+          _sharedWorker.onerror = (web.Event event) {
+            zone.run(() {
+              _errorController!.add(event);
+            });
+          }.toJS;
+        },
+        onCancel: () {
+          _errorController = null;
+          _sharedWorker.onerror = null;
+        },
+      );
     }
     return _errorController!.stream;
   }
@@ -122,16 +127,19 @@ class RawMessageSenderToWorker extends RawMessageSender {
   Stream<Object> get onError {
     if (_errorController == null) {
       var zone = Zone.current;
-      _errorController = StreamController<Object>.broadcast(onListen: () {
-        _worker.onerror = (web.Event event) {
-          zone.run(() {
-            _errorController!.add(event);
-          });
-        }.toJS;
-      }, onCancel: () {
-        _errorController = null;
-        _worker.onerror = null;
-      });
+      _errorController = StreamController<Object>.broadcast(
+        onListen: () {
+          _worker.onerror = (web.Event event) {
+            zone.run(() {
+              _errorController!.add(event);
+            });
+          }.toJS;
+        },
+        onCancel: () {
+          _errorController = null;
+          _worker.onerror = null;
+        },
+      );
     }
     return _errorController!.stream;
   }
@@ -141,7 +149,9 @@ class RawMessageSenderToWorker extends RawMessageSender {
 
   @override
   void postMessage(Object message, web.MessagePort responsePort) {
-    _worker.postMessage(message.jsifyValueStrict(),
-        messagePortToPortMessageOption(responsePort));
+    _worker.postMessage(
+      message.jsifyValueStrict(),
+      messagePortToPortMessageOption(responsePort),
+    );
   }
 }

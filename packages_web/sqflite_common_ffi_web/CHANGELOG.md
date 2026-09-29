@@ -1,7 +1,37 @@
-## 0.4.5+3
+## 1.1.1
+
+* Update sqlite3 wasm build to 3.1.2
+* Fix wasm and indexed db name overriding in shared worker mode
+
+## 1.1.0
+
+* sqlite ^3.1.0 (deps and wasm build)
+* Requires dart 3.9
+
+## 1.0.2
+
+* sqlite ^2.9.4 (deps and wasm build)
+
+## 1.0.1+2
+
+* Requires dart 3.9
+* Bump sqlite3 wasm build to 2.9.3
+
+## 1.0.1+1
+
+* Requires dart 3.8
+* Bump sqlite3 wasm build to 2.8.0
+
+## 1.0.0
+
+* Requires dart 3.7
+* Bump sqlite3 wasm build to 2.7.3
+
+## 0.4.5+4
 
 * Setup for sqlite3 2.3.6
 * Improved Wasm support
+* Mark it wasm ready for pub.dev
 
 ## 0.4.3+2
 

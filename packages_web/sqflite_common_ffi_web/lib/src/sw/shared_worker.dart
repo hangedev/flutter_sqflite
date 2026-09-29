@@ -6,6 +6,7 @@ import 'package:sqflite_common_ffi_web/src/import.dart';
 import 'package:sqflite_common_ffi_web/src/sqflite_ffi_impl_web.dart'; // ignore: implementation_imports
 import 'package:sqflite_common_ffi_web/src/utils.dart';
 import 'package:sqflite_common_ffi_web/src/web/js_utils.dart';
+import 'package:sqflite_common_ffi_web/src/web/load_sqlite.dart';
 import 'package:web/web.dart' as web;
 
 import 'constants.dart';
@@ -15,7 +16,7 @@ bool get _debug => sqliteFfiWebDebugWebWorker; // devWarning(true); // false
 var swGlobals = <String, Object?>{};
 var _log = print;
 SqfliteFfiWebContext? _swContext;
-SqfliteFfiWebOptions? _swOptions;
+var _swOptions = SqfliteFfiWebOptions();
 
 /// Sometimes needed when debugging to ensure we are testing the new version
 var _debugVersion = 2;
@@ -51,9 +52,11 @@ void _handleMessageEvent(web.Event event) async {
           var key = data['key'] as String;
           var value = swGlobals[key];
           _log('$_shw $command $key: $value');
-          port.postMessage({
-            'result': {'key': key, 'value': value}
-          }.jsifyValueStrict());
+          port.postMessage(
+            {
+              'result': {'key': key, 'value': value},
+            }.jsifyValueStrict(),
+          );
         } else {
           _log('$_shw $command unknown');
           port.postMessage(null);
@@ -65,17 +68,37 @@ void _handleMessageEvent(web.Event event) async {
           _log('$_shw method call $ffiMethodCall');
         }
         if (ffiMethodCall != null) {
+          var method = ffiMethodCall.method;
+          // Handle web options first, this is the first call done internally
+          if (method == methodSetWebOptions) {
+            var rawOptionsMap = ffiMethodCall.arguments as Map;
+            _swOptions = sqfliteFfiWebOptionsFromMap(rawOptionsMap);
+            port.postMessage(null);
+            return;
+          } else if (method == methodGetWebOptions) {
+            var optionsMap = _swOptions.toMap();
+            port.postMessage(
+              FfiMethodResponse(
+                result: optionsMap,
+              ).toDataMap().jsifyValueStrict(),
+            );
+            return;
+          }
           // Fix data
           ffiMethodCall = FfiMethodCall(
-              ffiMethodCall.method, dataFromEncodable(ffiMethodCall.arguments));
-          // Init context on first call
+            method,
+            dataFromEncodable(ffiMethodCall.arguments),
+          );
+
+          /// Init context on first call,
           if (_swContext == null) {
             if (_debug) {
               _log('$_shw loading wasm');
             }
             _swContext = await sqfliteFfiWebLoadSqlite3Wasm(
-                _swOptions ?? SqfliteFfiWebOptions(),
-                fromWebWorker: true);
+              _swOptions,
+              fromWebWorker: true,
+            );
             sqfliteFfiHandler = SqfliteFfiHandlerWeb(_swContext!);
           }
           void postResponse(FfiMethodResponse response) {

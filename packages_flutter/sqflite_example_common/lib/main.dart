@@ -82,6 +82,7 @@ const String testDeprecatedRoute = '/test/deprecated';
 
 /// Multi-database transaction test page.
 const String testMultiDbTransactionRoute = '/test/multi_db_transaction';
+
 /// Open database behavior test page.
 const String testOpenDatabaseBehaviorRoute = '/test/open_database_behavior';
 
@@ -126,8 +127,7 @@ class _SqfliteExampleAppState extends State<SqfliteExampleApp> {
         const MultiDbTransactionTestPage(),
     testOpenErrorVerifyRoute: (BuildContext context) =>
         const OhosOpenErrorVerifyPage(),
-    testDebugInfoRoute: (BuildContext context) =>
-        const DebugInfoTestPage(),
+    testDebugInfoRoute: (BuildContext context) => const DebugInfoTestPage(),
     testStressRoute: (BuildContext context) => const StressTestPage(),
     testBenchRoute: (BuildContext context) => const BenchTestPage(),
     testBigQueryRoute: (BuildContext context) => const BigQueryTestPage(),
@@ -138,21 +138,22 @@ class _SqfliteExampleAppState extends State<SqfliteExampleApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-        title: 'Sqflite Demo',
-        theme: ThemeData(
-          // This is the theme of your application.
-          //
-          // Try running your application with 'flutter run'. You'll see
-          // the application has a blue toolbar. Then, without quitting
-          // the app, try changing the primarySwatch below to Colors.green
-          // and then invoke 'hot reload' (press 'r' in the console where
-          // you ran 'flutter run', or press Run > Hot Reload App in IntelliJ).
-          // Notice that the counter didn't reset back to zero -- the application
-          // is not restarted.
-          primarySwatch: Colors.blue,
-        ),
-        home: MyHomePage(title: 'Sqflite Demo Home Page'),
-        routes: routes);
+      title: 'Sqflite Demo',
+      theme: ThemeData(
+        // This is the theme of your application.
+        //
+        // Try running your application with 'flutter run'. You'll see
+        // the application has a blue toolbar. Then, without quitting
+        // the app, try changing the primarySwatch below to Colors.green
+        // and then invoke 'hot reload' (press 'r' in the console where
+        // you ran 'flutter run', or press Run > Hot Reload App in IntelliJ).
+        // Notice that the counter didn't reset back to zero -- the application
+        // is not restarted.
+        primarySwatch: Colors.blue,
+      ),
+      home: MyHomePage(title: 'Sqflite Demo Home Page'),
+      routes: routes,
+    );
   }
 }
 
@@ -226,11 +227,7 @@ class MyHomePage extends StatefulWidget {
       ),
     );
     _items.add(
-      MainItem(
-        '多数据库事务隔离测试',
-        '多数据库事务隔离',
-        route: testMultiDbTransactionRoute,
-      ),
+      MainItem('多数据库事务隔离测试', '多数据库事务隔离', route: testMultiDbTransactionRoute),
     );
     _items.add(
       MainItem(

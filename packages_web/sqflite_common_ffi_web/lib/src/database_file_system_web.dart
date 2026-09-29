@@ -51,8 +51,9 @@ class SqfliteDatabaseFileSystemFfiWeb implements DatabaseFileSystem {
   Future<Uint8List> readDatabaseBytes(String path) async {
     await _flush();
     var fs = this.fs;
-    final file =
-        fs.xOpen(Sqlite3Filename(path), SqlFlag.SQLITE_OPEN_READONLY).file;
+    final file = fs
+        .xOpen(Sqlite3Filename(path), SqlFlag.SQLITE_OPEN_READONLY)
+        .file;
     try {
       var size = file.xFileSize();
       var target = Uint8List(size);
@@ -77,8 +78,10 @@ class SqfliteDatabaseFileSystemFfiWeb implements DatabaseFileSystem {
   Future<void> writeDatabaseBytes(String path, Uint8List bytes) async {
     await _flush();
     final file = fs
-        .xOpen(Sqlite3Filename(path),
-            SqlFlag.SQLITE_OPEN_READWRITE | SqlFlag.SQLITE_OPEN_CREATE)
+        .xOpen(
+          Sqlite3Filename(path),
+          SqlFlag.SQLITE_OPEN_READWRITE | SqlFlag.SQLITE_OPEN_CREATE,
+        )
         .file;
     try {
       file.xTruncate(0);
@@ -183,8 +186,10 @@ class RawMessageSenderToWorker extends RawMessageSender {
 
   @override
   void postMessage(Object message, web.MessagePort responsePort) {
-    _worker.postMessage(message.jsifyValueStrict(),
-        messagePortToPortMessageOption(responsePort));
+    _worker.postMessage(
+      message.jsifyValueStrict(),
+      messagePortToPortMessageOption(responsePort),
+    );
   }
 
   StreamController<Object>? _errorController;
@@ -193,16 +198,19 @@ class RawMessageSenderToWorker extends RawMessageSender {
   Stream<Object> get onError {
     if (_errorController == null) {
       var zone = Zone.current;
-      _errorController = StreamController<Object>.broadcast(onListen: () {
-        _worker.onerror = (web.Event event) {
-          zone.run(() {
-            _errorController!.add(event);
-          });
-        }.toJS;
-      }, onCancel: () {
-        _errorController = null;
-        _worker.onerror = null;
-      });
+      _errorController = StreamController<Object>.broadcast(
+        onListen: () {
+          _worker.onerror = (web.Event event) {
+            zone.run(() {
+              _errorController!.add(event);
+            });
+          }.toJS;
+        },
+        onCancel: () {
+          _errorController = null;
+          _worker.onerror = null;
+        },
+      );
     }
     return _errorController!.stream;
   }

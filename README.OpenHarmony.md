@@ -2,7 +2,7 @@
   <h1 align="center">sqflite</h1>
 </p>
 
-This project is based on [sqflite@2.4.2](https://pub.dev/packages/sqflite/versions/2.4.2).
+This project is based on [sqflite@2.4.2+1](https://pub.dev/packages/sqflite/versions/2.4.2+1).
 
 ## Introduction
 
@@ -62,10 +62,12 @@ flutter pub get
 | 3.22                      | 2.2.8-ohos-1.0.0   | master           |
 | 3.27                      | 2.4.2-ohos-1.0.1   | br_v2.4.2_ohos   |
 | 3.35                      | 2.4.2-ohos-1.0.1   | br_v2.4.2_ohos   |
+| 3.41                      | 2.4.2_1-ohos-1.0.0 | br_3.41_dev      |
+| 3.44                      | 2.4.2_1-ohos-1.0.0 | br_3.41_dev      |
 
 ### Upgrade & Migration
 
-To upgrade from an older OpenHarmony adaptation (for example `2.2.8-ohos-1.0.0`, based on upstream sqflite 2.2.8) to the current `2.4.2-ohos-1.0.1` (based on upstream sqflite 2.4.2):
+To upgrade from an older OpenHarmony adaptation (for example `2.2.8-ohos-1.0.0`, based on upstream sqflite 2.2.8) to the current `2.4.2_1-ohos-1.0.0` (based on upstream sqflite 2.4.2+1):
 
 1. Change the dependency `ref` in pubspec.yaml to the target TAG, then run `flutter pub get`:
 
@@ -74,11 +76,11 @@ dependencies:
   sqflite:
     git:
       url: "https://gitcode.com/CPF-Flutter/flutter_sqflite.git"
-      ref: 2.4.2-ohos-1.0.1
+      ref: 2.4.2_1-ohos-1.0.0
       path: sqflite
 ```
 
-2. Match the Flutter framework version to the TAG: `2.4.2-ohos-1.0.1` requires the Flutter 3.27 / 3.35 ohos releases (see the TAG Version Mapping above and [Compatibility](#compatibility)); upgrading the framework version also means upgrading the matching DevEco Studio / OH SDK toolchain.
+2. Match the Flutter framework version to the TAG: `2.4.2_1-ohos-1.0.0` requires the Flutter 3.41 / 3.44 ohos releases (Dart ^3.10.0, following upstream; see the TAG Version Mapping above and [Compatibility](#compatibility)); upgrading the framework version also means upgrading the matching DevEco Studio / OH SDK toolchain.
 3. Review the behavioral changes shipped in the target release in [CHANGELOG.OpenHarmony.md](./CHANGELOG.OpenHarmony.md). Notable OHOS changes when moving from 2.2.x to 2.4.x:
    * Platform-channel handling moved off the UI thread onto a background worker: large batch inserts no longer trigger `THREAD_BLOCK_6S` appfreeze (issues #45, #65) and large result sets are no longer limited by the SharedBlock 2MB transfer cap (issue #75).
    * `VACUUM` is no longer misreported as a `syntax error`; the RDB engine attempts a real execution and returns an explicit "not supported on this platform (OpenHarmony RDB)" error when it rejects the statement. If your code relied on `VACUUM`, handle this error explicitly.
@@ -91,8 +93,8 @@ dependencies:
 
 This document is verified based on the following versions:
 
-1. Flutter: 3.27.5-ohos-0.0.1; SDK: 5.0.5(17); IDE: DevEco Studio: 5.1.0.828; ROM: 5.1.0.130 SP8;
-2. Flutter: 3.35.8-ohos-0.0.1; SDK: 5.0.5(17); IDE: DevEco Studio: 6.0.2.640; ROM: 6.0.0.328 SP22;
+1. Flutter: 3.41.10-ohos-1.0.0; SDK: 5.0.5(17); IDE: DevEco Studio: 6.1.1.268; ROM: 6.0.0.130 SP25;
+2. Flutter: 3.44.9+ohos-0.0.1-canary1; SDK: 5.0.5(17); IDE: DevEco Studio: 6.1.1.290; ROM: 6.0.0.130 SP25;
 
 ### **Permission Requirements**
 
@@ -101,6 +103,8 @@ This document is verified based on the following versions:
 ### **Known Platform Differences**
 
 1. **BigInt arguments are stored as TEXT (SDK API ≥ 20)**: integer parameters outside `Number.MAX_SAFE_INTEGER` are bound as strings (a workaround for an RDB bigint-binding defect), so the value is persisted as TEXT instead of INTEGER and reads back as a `string`/`BigInt` instead of a `number`. Such columns have no integer semantics: `ORDER BY`, comparisons and aggregations follow text rules (e.g. `'10' < '9'`), and a TEXT value never compares equal to an INTEGER value. Treat these columns as text, or convert values after reading.
+
+2. **`Database.setJournalMode()` is not supported**: the helper (added with upstream `sqflite_common 2.5.6+1`) issues `PRAGMA journal_mode = X`, which the OHOS RDB engine rejects on both the execute and the query path, so calling it always throws a `DatabaseException(syntax error)`. The journal mode is managed internally by the OHOS RDB component: applications can neither query the current mode (`PRAGMA journal_mode` is rejected as well) nor switch it reliably (a compact `PRAGMA journal_mode=WAL` statement does not error, but its effect cannot be verified). Do not call `setJournalMode` on OHOS; journal mode and its concurrency characteristics are decided by the system RDB, not by the application.
 
 ## Example
 

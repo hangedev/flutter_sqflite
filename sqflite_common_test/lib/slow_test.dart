@@ -9,12 +9,15 @@ void run(SqfliteTestContext context) {
       var path = await context.initDeleteDb('slow_txn_100_insert.db');
       var db = await factory.openDatabase(path);
       await db.execute('CREATE TABLE Test (id INTEGER PRIMARY KEY, name TEXT)');
+      var sw = Stopwatch()..start();
       await db.transaction((txn) async {
         for (var i = 0; i < 100; i++) {
-          await txn
-              .rawInsert('INSERT INTO Test (name) VALUES (?)', ['item $i']);
+          await txn.rawInsert('INSERT INTO Test (name) VALUES (?)', [
+            'item $i',
+          ]);
         }
       });
+      print('100 insert: ${sw.elapsed}');
       await db.close();
     });
 
@@ -23,9 +26,11 @@ void run(SqfliteTestContext context) {
       var path = await context.initDeleteDb('slow_100_insert.db');
       var db = await factory.openDatabase(path);
       await db.execute('CREATE TABLE Test (id INTEGER PRIMARY KEY, name TEXT)');
+      var sw = Stopwatch()..start();
       for (var i = 0; i < 1000; i++) {
         await db.rawInsert('INSERT INTO Test (name) VALUES (?)', ['item $i']);
       }
+      print('100 insert no txn: ${sw.elapsed}');
       await db.close();
     }, timeout: const Timeout(Duration(minutes: 2)));
 
@@ -37,8 +42,9 @@ void run(SqfliteTestContext context) {
       var sw = Stopwatch()..start();
       await db.transaction((txn) async {
         for (var i = 0; i < 1000; i++) {
-          await txn
-              .rawInsert('INSERT INTO Test (name) VALUES (?)', ['item $i']);
+          await txn.rawInsert('INSERT INTO Test (name) VALUES (?)', [
+            'item $i',
+          ]);
         }
       });
       print('1000 insert ${sw.elapsed}');
@@ -62,8 +68,9 @@ void run(SqfliteTestContext context) {
     });
 
     test('Perf 1000 insert batch no result', () async {
-      var path =
-          await context.initDeleteDb('slow_txn_1000_insert_batch_no_result.db');
+      var path = await context.initDeleteDb(
+        'slow_txn_1000_insert_batch_no_result.db',
+      );
       var db = await factory.openDatabase(path);
       await db.execute('CREATE TABLE Test (id INTEGER PRIMARY KEY, name TEXT)');
 

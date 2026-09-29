@@ -15,7 +15,7 @@ Future<void> main() async {
 
 /// Run using ffi (io or web)
 Future<void> mainFfi({bool? noWorker, bool? webBasicWorker}) async {
-  await initFfi(noWorker: true, webBasicWorker: webBasicWorker);
+  await initFfi(noWorker: noWorker, webBasicWorker: webBasicWorker);
   await runFfi();
 }
 
@@ -57,7 +57,8 @@ Future<void> initFfi({bool? noWorker, bool? webBasicWorker}) async {
   // Use sqflite databases path provider (ffi implementation is lame))
   if (isSqfliteCompatible) {
     await databaseFactory.setDatabasesPath(
-        await databaseFactorySqflitePlugin.getDatabasesPath());
+      await databaseFactorySqflitePlugin.getDatabasesPath(),
+    );
   }
 }
 

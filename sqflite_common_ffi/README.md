@@ -4,7 +4,7 @@
 on [`sqlite3`](https://pub.dev/packages/sqlite3). Thanks to [Simon Binder](https://github.com/simolus3)
 
 * Works on Linux, MacOS and Windows on both Flutter and Dart VM.
-* Works on iOS and Android (using [sqlite3_flutter_libs](https://pub.dev/packages/sqlite3_flutter_libs) - Thanks
+* Works on iOS and Android (using [sqlite3](https://pub.dev/packages/sqlite3) - Thanks
 to [Simon Binder](https://github.com/simolus3))
 
 It allows also mocking sqflite during regular flutter unit test (i.e. not using the emulator/simulator).
@@ -18,6 +18,28 @@ Add the following dev dependency:
 ```yaml
 dev_dependencies:
   sqflite_common_ffi:
+```
+
+### sqlite3 v2 support
+
+See [here](https://github.com/tekartik/sqflite/blob/master/sqflite_common_ffi/doc/troubleshooting.md#sqlite3-v2-support)
+
+Use the following constraint
+```yaml
+dependencives:
+  sqlite3: ^2.9.4
+  sqflite_common_ffi: ^2.3.7
+```
+
+### sqlite3 v3 support
+
+See [here](https://github.com/tekartik/sqflite/blob/master/sqflite_common_ffi/doc/troubleshooting.md#sqlite3-v3-support)
+
+Use the following constraint
+```yaml
+dependencives:
+  sqlite3: ^3.0.0
+  sqflite_common_ffi: ^2.4.0
 ```
 
 ### Linux
@@ -42,15 +64,19 @@ Should work as is.
 
 ### Windows
 
-Should work as is in debug mode (`sqlite3.dll` is bundled).
-
-In release mode,
-add [sqlite3.dll](https://github.com/tekartik/sqflite/raw/master/sqflite_common_ffi/lib/src/windows/sqlite3.dll) in same
-folder as your executable.
+Should work as is. sqlite3 v3 uses build_hooks to build and setup sqlite3.dll.
 
 `sqfliteFfiInit` is provided as an implementation reference for loading the sqlite library. Please look
 at [sqlite3](https://pub.dev/packages/sqlite3)
 if you want to override the behavior.
+
+#### Note for sqlite3 < 3.0.0, sqflite_common_ffi < 2.4
+
+Should work as is in debug mode (`sqlite3.dll` is bundled).
+
+In release mode, add `sqlite3.dll` [last version updated](https://github.com/tekartik/sqflite/blob/1dd13926ec92015640068fca1601b4d1fadfa2ee/sqflite_common_ffi/lib/src/windows/sqlite3.dll) in same
+folder as your executable.
+
 
 ### Web
 

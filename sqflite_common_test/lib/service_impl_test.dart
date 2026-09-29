@@ -11,7 +11,7 @@ import 'src/sqflite_import.dart';
 class FactoryServiceDelegate with SqfliteDatabaseFactoryMixin {
   /// Factory delegate storing logs
   FactoryServiceDelegate({required DatabaseFactory factory})
-      : _factory = factory as SqfliteDatabaseFactory;
+    : _factory = factory as SqfliteDatabaseFactory;
 
   final _ins = <dynamic>[];
   final _outs = <dynamic>[];
@@ -28,10 +28,7 @@ class FactoryServiceDelegate with SqfliteDatabaseFactoryMixin {
 
   @override
   Future<T> invokeMethod<T>(String method, [arguments]) async {
-    var map = <String, Object?>{
-      'm': method,
-      if (arguments != null) 'a': arguments
-    };
+    var map = <String, Object?>{'m': method, 'a': ?arguments};
     _ins.add(map);
     T result;
     try {
@@ -67,8 +64,10 @@ void run(SqfliteTestContext context) {
     test('open single instance in memory', () async {
       factory.clear();
 
-      var db = await factory.openDatabase(inMemoryDatabasePath,
-          options: OpenDatabaseOptions(singleInstance: false));
+      var db = await factory.openDatabase(
+        inMemoryDatabasePath,
+        options: OpenDatabaseOptions(singleInstance: false),
+      );
       await db.close();
 
       var ins = factory.ins;
@@ -82,16 +81,16 @@ void run(SqfliteTestContext context) {
       expect(factory.ins, [
         {
           'm': 'openDatabase',
-          'a': {'path': ':memory:', 'singleInstance': false}
+          'a': {'path': ':memory:', 'singleInstance': false},
         },
         {
           'm': 'closeDatabase',
-          'a': {'id': id}
-        }
+          'a': {'id': id},
+        },
       ]);
       expect(outs, [
         {'id': id},
-        null
+        null,
       ]);
     });
   });
