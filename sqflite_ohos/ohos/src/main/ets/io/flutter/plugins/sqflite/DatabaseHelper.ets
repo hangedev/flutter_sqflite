@@ -420,11 +420,60 @@ export class DatabaseHelper {
 
       let config: relationalStore.StoreConfig = DatabaseHelper.createDatabaseConfig(dbPathDirList, dbName);
       await relationalStore.deleteRdbStore(context, config);
+      // deleteRdbStore leaves framework companion files behind on some system
+      // versions (e.g. <db>.rdbdfx.lock / <db>.rdbdfx.json), clean them up so
+      // the db directory contains no file starting with the db file name.
+      // Match on dbName (forced .db suffix), same as deleteRdbStore: a
+      // suffix-less path ('a') must not widen the match to unrelated files
+      // (a database opened as 'a.db2' lives in a.db2.db and must be kept).
+      const dirEnd: number = dbPath.lastIndexOf('/');
+      if (dirEnd >= 0) {
+        await DatabaseHelper.deleteDbRelatedFiles(`${dbPath.substring(0, dirEnd)}/${dbName}`);
+      }
       result = true;
       return result;
     } catch (e) {
       Log.e('DatabaseHelper', `deleteRdbStore failed: ${JSON.stringify(e)}`);
       return result;
+    }
+  }
+
+  /**
+   * Remove companion files of the database in its directory: the db file itself
+   * plus files hanging off its name via '.' or '-' (sqlite sidecar files
+   * -journal/-wal/-shm, framework DFX stats <dbPath>.rdbdfx.lock/.json, ...).
+   * Companion file names vary across system versions and cannot be enumerated
+   * reliably, so match by base name + separator prefix. Files that merely
+   * start with the db name are kept (a database opened as 'a.db2' is stored
+   * as a.db2.db and never matched by a.db's companions cleanup).
+   * @param dbPath full path of the database file, with its final .db name
+   */
+  private static async deleteDbRelatedFiles(dbPath: string): Promise<void> {
+    const dirEnd: number = dbPath.lastIndexOf('/');
+    if (dirEnd < 0) {
+      return;
+    }
+    const dir: string = dbPath.substring(0, dirEnd);
+    const dbFileName: string = dbPath.substring(dirEnd + 1);
+    try {
+      if (!await fs.access(dir)) {
+        return;
+      }
+      const names: string[] = await fs.listFile(dir);
+      for (const name of names) {
+        const isRelated: boolean = name === dbFileName || name.startsWith(`${dbFileName}.`) ||
+          name.startsWith(`${dbFileName}-`);
+        if (isRelated) {
+          try {
+            await fs.unlink(`${dir}/${name}`);
+          } catch (e) {
+            // A single file cleanup failure must not abort the deletion flow
+            Log.e('DatabaseHelper', `delete db related file failed: ${name}, ${JSON.stringify(e)}`);
+          }
+        }
+      }
+    } catch (e) {
+      Log.e('DatabaseHelper', `list db directory failed: ${dir}, ${JSON.stringify(e)}`);
     }
   }
 
