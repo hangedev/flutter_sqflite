@@ -21,6 +21,24 @@
           ]
         }
       ]
+    },
+    {
+      "name": "sqflite_ohos",
+      "srcPath": "../../ohos",
+      "targets": [
+        {
+          "name": "sqflite_ohos",
+          "applyToProducts": [
+            "default"
+          ]
+        },
+        {
+          "name": "ohosTest",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
     }
   ]
 }

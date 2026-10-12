@@ -1,0 +1,8 @@
+// Coverage instrumentation filter: include the plugin har sources so the
+// ohosTest coverage build instruments sqflite_ohos (oh_modules deps are
+// excluded from instrumentation by default).
+{
+  "includeHar": [
+    "sqflite_ohos"
+  ]
+}
