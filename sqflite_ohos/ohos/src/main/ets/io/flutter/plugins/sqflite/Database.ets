@@ -176,19 +176,23 @@ export class Database {
     let resultCode = Constant.SQLITE_CONSTRAINT_UNIQUE;
     let errorMessage = 'UNIQUE constraint failed';
 
-    const insertMatch = sql.match(/INSERT\s+INTO\s+(\w+)\s*\((\w+)\)/i);
+    // Capture the full column list: a composite primary key INSERT INTO t (a, b) VALUES (...)
+    // needs all columns collected; matching a single column only would map composite-pk
+    // conflicts to 2067 instead of 1555
+    const insertMatch = sql.match(/INSERT\s+INTO\s+(\w+)\s*\(([^)]+)\)/i);
 
     if (insertMatch && db) {
       const tableName = insertMatch[1];
-      const columnName = insertMatch[2];
+      const columns: string[] = insertMatch[2].split(',').map((col: string) => col.trim());
 
-      // 检查列是否为主键
-      const isPrimaryKey = await Database.checkIfPrimaryKey(db, tableName, columnName);
+      // Treat as a primary-key conflict (1555) when the inserted columns cover the
+      // full table primary key; otherwise keep the unique-constraint code (2067)
+      const isPrimaryKey = await Database.checkColumnsCoverPrimaryKey(db, tableName, columns);
       if (isPrimaryKey) {
         resultCode = Constant.SQLITE_CONSTRAINT_PRIMARYKEY; // 1555
       }
 
-      errorMessage = `UNIQUE constraint failed: ${tableName}.${columnName}`;
+      errorMessage = `UNIQUE constraint failed: ${tableName}.${columns.join(', ')}`;
     }
 
     const finalMessage = `${errorMessage} (code ${resultCode})`;
@@ -196,20 +200,26 @@ export class Database {
   }
 
   /**
-   * 检查列是否为主键
+   * Check whether the given columns cover the full primary key of the table
+   * (for a composite key, table_info reports pk as ordinals 1, 2, ...)
    */
-  private static async checkIfPrimaryKey(db: relationalStore.RdbStore, tableName: string,
-    columnName: string): Promise<boolean> {
+  private static async checkColumnsCoverPrimaryKey(db: relationalStore.RdbStore, tableName: string,
+    columns: string[]): Promise<boolean> {
     try {
       const resultSet = await db.querySql(`PRAGMA table_info(${tableName})`);
+      const pkColumns: string[] = [];
       while (resultSet.goToNextRow()) {
         const row = resultSet.getRow();
-        if (row['name'] === columnName && row['pk'] === 1) {
-          resultSet.close();
-          return true;
+        if (Number(row['pk']) > 0) {
+          pkColumns.push(row['name'] as string);
         }
       }
       resultSet.close();
+      if (pkColumns.length === 0) {
+        return false;
+      }
+      const covered: boolean = pkColumns.every((pkCol: string) => columns.includes(pkCol));
+      return covered;
     } catch (e) {
       Log.e(Constant.TAG, `Failed to query table_info: ${e}`);
     }
@@ -473,8 +483,13 @@ export class Database {
       // 继续读取下一页数据
       let results = Database.handleQuerySqlResult(resultSet, cursorPageSize);
 
-      // 判断是否还有更多数据
-      cursorHasMoreData = !resultSet.isAtLastRow;
+      // Decide whether more data may follow: isAtLastRow is false on a partial final page
+      // (goToNextRow already moved past the last row, cursor out of range), which misjudged
+      // an exhausted cursor as having more data and leaked the handle. Judge by whether the
+      // page was fully read instead, matching Android cursor pagination semantics (a full
+      // page may have more; a partial page is necessarily exhausted).
+      const rowsRead: object[] = results.get(Constant.PARAM_ROWS) as object[];
+      cursorHasMoreData = cursorPageSize != null && cursorPageSize > 0 && rowsRead.length >= cursorPageSize;
 
       if (cursorHasMoreData) {
         // 继续保存 cursorId
@@ -661,9 +676,15 @@ export class Database {
   private static handleCursorPagination(resultSet: relationalStore.ResultSet, cursorPageSize: number | undefined,
     results: Map<String, object>, dbId: number | undefined): number | null {
     // 判断是否需要保存 ResultSet
+    // Aligned with Android !(isLast() || isAfterLast()): a page that was not
+    // filled (0 rows or an exhausted tail, where goToNextRow already moved past
+    // the last row and isAtLastRow stays false) is necessarily done, so no
+    // cursor must be saved. A filled page parked exactly on the last row is
+    // done too; isAtLastRow is only meaningful in that filled-page state.
     let cursorHasMoreData = false;
     if (cursorPageSize != null && cursorPageSize > 0) {
-      cursorHasMoreData = !resultSet.isAtLastRow;
+      const rowsRead: object[] = results.get(Constant.PARAM_ROWS) as object[];
+      cursorHasMoreData = rowsRead.length >= cursorPageSize && !resultSet.isAtLastRow;
     }
 
     if (cursorHasMoreData) {

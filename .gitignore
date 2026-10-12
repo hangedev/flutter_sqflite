@@ -70,3 +70,6 @@ _pubspec_overrides.yaml
 !.gitignore
 !/.github
 
+# Local ohos har build output (test infrastructure)
+sqflite_ohos/ohos/har/
+

@@ -16,6 +16,9 @@
   "targets": [
     {
       "name": "sqflite_ohos"
+    },
+    {
+      "name": "ohosTest"
     }
   ]
 }
