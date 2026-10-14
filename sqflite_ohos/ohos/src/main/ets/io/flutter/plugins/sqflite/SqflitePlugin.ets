@@ -99,6 +99,17 @@ export default class SqflitePlugin implements FlutterPlugin {
       this.sqfliteWorker.onerror = (e: ErrorEvent): void => {
         Log.e('SqflitePlugin', 'SqfliteWorker error: ' + e.message);
       };
+      // One-time init: context is structured-cloned only in this message and
+      // stored in a worker module variable; port messages are FIFO, so init
+      // always arrives before any task message.
+      try {
+        const initMessage: SqfliteInitMessage = { init: true, context: this.context };
+        this.sqfliteWorker.postMessage(initMessage);
+      } catch (e) {
+        // Worker died right after creation: context-dependent methods fall
+        // back to the worker-side uninitialized-context error.
+        Log.e('SqflitePlugin', 'post init (context) to worker failed: ' + e);
+      }
     }
 
     // raw handler：默认（不传 taskQueue）在平台主线程执行，
@@ -116,13 +127,14 @@ export default class SqflitePlugin implements FlutterPlugin {
         }
         const id: number = ++(this.seq);
         this.pending.set(id, reply);
-        // context 随每条 message 透传进 worker（PR#25 同作者验证的 args 模式，
-        // 避免 @Sendable 字段约束）。
+        // context is NOT shipped with task messages: it is delivered once via
+        // the init message at attach, avoiding one common.Context structured
+        // clone per message (a major source of shared-heap churn).
         try {
           // 拷贝后转发：engine 在 onMessage 返回后可能复用该 message 的 ArrayBuffer。
           const messageCopy = message.slice(0);
           this.sqfliteWorker!.postMessageWithSharedSendable(
-            { seq: id, message: messageCopy, context: this.context }, [messageCopy]);
+            { seq: id, message: messageCopy }, [messageCopy]);
         } catch (e) {
           // worker 在 null 检查后被终止 / 序列化失败：回滚 pending 并回 null，保证 Dart 不挂。
           Log.e('SqflitePlugin', 'postMessage to worker failed, replying null: ' + e);
@@ -180,7 +192,6 @@ export default class SqflitePlugin implements FlutterPlugin {
       const disposeTask: SqfliteTaskMessage = {
         seq: Constant.WORKER_DISPOSE_SEQ,
         message: new ArrayBuffer(0),
-        context: this.context,
         dispose: true
       };
       workerToDispose.postMessage(disposeTask);
@@ -228,11 +239,18 @@ interface SqfliteReply {
   result: ArrayBuffer | null;
 }
 
+// One-time init message sent to the worker: context appears only here (one per
+// worker); the worker stores it in the module-level workerContext, so task
+// messages carry no context.
+interface SqfliteInitMessage {
+  init: boolean;
+  context: common.Context | null;
+}
+
 // 发送给 worker 的任务消息（与 SqfliteWorker.ets 的 SqfliteTask 对应；
 // dispose=true 时 worker 清理全部资源后自行退出）
 interface SqfliteTaskMessage {
   seq: number;
   message: ArrayBuffer;
-  context: common.Context | null;
   dispose?: boolean;
 }

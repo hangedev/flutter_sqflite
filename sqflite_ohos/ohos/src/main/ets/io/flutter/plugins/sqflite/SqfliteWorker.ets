@@ -50,7 +50,9 @@ const codec = StandardMethodCodec.INSTANCE;
 interface SqfliteTask {
   seq: number;
   message: ArrayBuffer;
-  context: common.Context;
+  // init=true: one-time context init message sent at attach (see workerContext)
+  init?: boolean;
+  context?: common.Context;
   // true 表示插件 detach 请求：清理全部资源后自行退出，不进入串行队列
   dispose?: boolean;
 }
@@ -58,9 +60,19 @@ interface SqfliteTask {
 // 串行队列：逐条 await，保证 worker 内一次只处理一条 message（等价 Android THREAD_COUNT=1）。
 const queue: SqfliteTask[] = [];
 let running: boolean = false;
+// Context delivered once via the init message at attach (used by
+// openDatabase/deleteDatabase/getDatabasesPath). Task messages no longer carry
+// it, removing one structured clone per message.
+let workerContext: common.Context | null = null;
 
 workerPort.onmessage = (e: MessageEvents): void => {
   const task: SqfliteTask = e.data as SqfliteTask;
+  // One-time init: the main thread delivers context at attach (port messages
+  // are FIFO, so init always arrives before any task message).
+  if (task.init === true) {
+    workerContext = task.context ?? null;
+    return;
+  }
   // 插件 detach：插队执行全量资源清理（在途任务的回执此时已无意义，
   // 主线程已 flush pending，其 seq 路由不到 reply 会被忽略；
   // 清理与在途任务并发只会让后者报错回执，不会崩溃）。
@@ -84,6 +96,9 @@ async function handleDispose(): Promise<void> {
   } catch (err) {
     Log.e('SqfliteWorker', `dispose error: ${err}`);
   } finally {
+    // Release the context reference before exit (the worker terminates on
+    // close and its module variables are reclaimed with it)
+    workerContext = null;
     workerPort.close();
   }
 }
@@ -95,14 +110,14 @@ async function runQueue(): Promise<void> {
   try {
     while (queue.length > 0) {
       const task: SqfliteTask = queue.shift() as SqfliteTask;
-      await handleOne(task.seq, task.message, task.context);
+      await handleOne(task.seq, task.message);
     }
   } finally {
     running = false;
   }
 }
 
-async function handleOne(seq: number, message: ArrayBuffer, context: common.Context): Promise<void> {
+async function handleOne(seq: number, message: ArrayBuffer): Promise<void> {
   let result: ArrayBuffer | null = null;
   try {
     const call: MethodCall = codec.decodeMethodCall(message);
@@ -120,7 +135,7 @@ async function handleOne(seq: number, message: ArrayBuffer, context: common.Cont
         captured = StringUtils.stringToArrayBuffer('');
       }
     };
-    await dispatch(call, methodResult, context);
+    await dispatch(call, methodResult);
     result = captured;
     // 回执必须在 try 内发出：postMessage 自身若抛（transfer 失败/worker 已终止），
     // 走 catch 回 error envelope，并由 runQueue 的 finally 兜底复位 running，不会假死。
@@ -140,12 +155,24 @@ async function handleOne(seq: number, message: ArrayBuffer, context: common.Cont
   }
 }
 
-async function dispatch(call: MethodCall, result: MethodResult, context: common.Context): Promise<void> {
+async function dispatch(call: MethodCall, result: MethodResult): Promise<void> {
+  // context comes from the init message (workerContext) and is needed by only
+  // the three methods below; without init, reply an explicit error instead of
+  // crashing (init always arrives first in the normal flow; safety net).
+  const context: common.Context | null = workerContext;
   switch (call.method) {
     case Constant.METHOD_OPEN_DATABASE:
+      if (context === null) {
+        result.error(Constant.ERROR_BAD_PARAM, 'openDatabase: worker context not initialized', null);
+        return;
+      }
       await DatabaseHelper.openDatabase(context, call, result);
       break;
     case Constant.METHOD_GET_DATABASES_PATH:
+      if (context === null) {
+        result.error(Constant.ERROR_BAD_PARAM, 'getDatabasesPath: worker context not initialized', null);
+        return;
+      }
       handleGetDatabasesPathCall(context, result);
       break;
     case Constant.METHOD_DATABASE_EXISTS:
@@ -185,6 +212,10 @@ async function dispatch(call: MethodCall, result: MethodResult, context: common.
       await handleCloseDatabaseCall(call, result);
       break;
     case Constant.METHOD_DELETE_DATABASE:
+      if (context === null) {
+        result.error(Constant.ERROR_BAD_PARAM, 'deleteDatabase: worker context not initialized', null);
+        return;
+      }
       await handleDeleteDatabaseCall(context, call, result);
       break;
     default:

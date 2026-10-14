@@ -13,6 +13,7 @@
 * `sqflite/example` now takes `sqflite_example_common` from the in-repo path (`packages_flutter/sqflite_example_common`) instead of upstream's floating `git` dependency. The previous OHOS releases pinned the git ref to the `dart3a` branch; upstream `2.4.2+1` floats against the repository HEAD, whose current `sqflite_example_common` requires `sqflite_common >=2.5.9` (Dart >= 3.12) and therefore cannot resolve under the Flutter 3.41 toolchain (Dart 3.11.5). The path dependency keeps the example resolvable on both the 3.41 and 3.44 ohos toolchains and works offline.
 * Files upstream removed were dropped accordingly (windows ffi setup restructure, legacy android example gradle files, `LocaleUtils.java`, `io_test.dart` renamed to `io_tests_io.dart`/`io_tests_stub.dart`).
 * `sqflite_ohos` and its example pubspec constraints follow the synced release: Dart sdk ^3.10.0, flutter >=3.38.0, sqflite_common >=2.5.6, sqflite_platform_interface >=2.4.0; the plugin code itself is unchanged.
+* OHOS: the worker now receives the application context once in an init message when it is created, instead of attaching a `common.Context` copy to every task message. This removes one structured clone per platform message and the associated shared-heap churn under heavy batch load; on device, the runtime `SharedFullGC` abort observed under sustained stress no longer reproduces (GC logs show shared-heap remembered-set processing dropping to zero in steady state).
 
 ### Fixed
 
