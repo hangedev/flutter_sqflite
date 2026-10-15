@@ -59,7 +59,10 @@ class CapturedReply implements BinaryReply {
 // Fake BinaryReply whose reply() throws, simulating an already-closed
 // engine-side reply channel.
 class ThrowingReply implements BinaryReply {
+  public called: boolean = false;
+
   reply(reply: ArrayBuffer | null): void {
+    this.called = true;
     throw new Error('reply channel already closed');
   }
 }
@@ -74,12 +77,27 @@ function makeBinding(messenger: FakeMessenger): FlutterPluginBinding {
     unusedAssets, unusedTextures);
 }
 
+const WORKER_ROUNDTRIP_WAIT_MS: number = 500;
+const WORKER_ROUNDTRIP_DEADLINE_MS: number = 2000;
+const WAIT_UNTIL_POLL_MS: number = 100;
+
 function wait(ms: number): Promise<void> {
   return new Promise<void>((resolve) => {
     setTimeout(() => {
       resolve();
     }, ms);
   });
+}
+
+async function waitUntil(condition: () => boolean, deadlineMs: number): Promise<boolean> {
+  const deadline: number = Date.now() + deadlineMs;
+  while (!condition()) {
+    if (Date.now() >= deadline) {
+      return false;
+    }
+    await wait(WAIT_UNTIL_POLL_MS);
+  }
+  return true;
 }
 
 export default function SqflitePluginTest(): void {
@@ -122,8 +140,7 @@ export default function SqflitePluginTest(): void {
       const reply: CapturedReply = new CapturedReply();
       rawHandler.onMessage(new ArrayBuffer(0), reply);
       // Worker round-trips are asynchronous; wait long enough for either path
-      await wait(500);
-      expect(reply.replied).assertTrue();
+      expect(await waitUntil(() => reply.replied, WORKER_ROUNDTRIP_DEADLINE_MS)).assertTrue();
       plugin.onDetachedFromEngine(makeBinding(messenger));
     });
 
@@ -172,12 +189,12 @@ export default function SqflitePluginTest(): void {
       plugin.onAttachedToEngine(makeBinding(messenger));
       const rawHandler: BinaryMessageHandler = messenger.registeredHandlers[0] as BinaryMessageHandler;
       // First message: the reply channel throws when the worker answers it
-      rawHandler.onMessage(new ArrayBuffer(0), new ThrowingReply());
-      await wait(600);
+      const throwing: ThrowingReply = new ThrowingReply();
+      rawHandler.onMessage(new ArrayBuffer(0), throwing);
+      expect(await waitUntil(() => throwing.called, WORKER_ROUNDTRIP_DEADLINE_MS)).assertTrue();
       const later: CapturedReply = new CapturedReply();
       rawHandler.onMessage(new ArrayBuffer(0), later);
-      await wait(600);
-      expect(later.replied).assertTrue();
+      expect(await waitUntil(() => later.replied, WORKER_ROUNDTRIP_DEADLINE_MS)).assertTrue();
       plugin.onDetachedFromEngine(makeBinding(messenger));
     });
 
@@ -185,21 +202,23 @@ export default function SqflitePluginTest(): void {
     // message must get an immediate null reply instead of posting into the
     // dead worker (worker-unavailable fallback path)
     it('rawHandler_after_dispose_timeout_replies_null', 0, async () => {
-      const plugin: SqflitePlugin = new SqflitePlugin();
-      const messenger: FakeMessenger = new FakeMessenger();
-      plugin.onAttachedToEngine(makeBinding(messenger));
-      const rawHandler: BinaryMessageHandler = messenger.registeredHandlers[0] as BinaryMessageHandler;
-      plugin.onDetachedFromEngine(makeBinding(messenger));
-      // disposeWorker posts the dispose task and nulls sqfliteWorker after
-      // the WORKER_DISPOSE_TIMEOUT_MS fallback timeout
-      await wait(Constant.WORKER_DISPOSE_TIMEOUT_MS + 500);
-      const late: CapturedReply = new CapturedReply();
-      rawHandler.onMessage(new ArrayBuffer(0), late);
-      expect(late.replied).assertTrue();
-      expect(late.payload).assertNull();
-      // A second detach after the worker reference is gone must be a safe
-      // no-op (disposeWorker null-worker guard)
-      plugin.onDetachedFromEngine(makeBinding(new FakeMessenger()));
+      const originalTimeout: number = Constant.WORKER_DISPOSE_TIMEOUT_MS;
+      Constant.WORKER_DISPOSE_TIMEOUT_MS = WORKER_ROUNDTRIP_WAIT_MS;
+      try {
+        const plugin: SqflitePlugin = new SqflitePlugin();
+        const messenger: FakeMessenger = new FakeMessenger();
+        plugin.onAttachedToEngine(makeBinding(messenger));
+        const rawHandler: BinaryMessageHandler = messenger.registeredHandlers[0] as BinaryMessageHandler;
+        plugin.onDetachedFromEngine(makeBinding(messenger));
+        await wait(WORKER_ROUNDTRIP_WAIT_MS * 2);
+        const late: CapturedReply = new CapturedReply();
+        rawHandler.onMessage(new ArrayBuffer(0), late);
+        expect(late.replied).assertTrue();
+        expect(late.payload).assertNull();
+        plugin.onDetachedFromEngine(makeBinding(new FakeMessenger()));
+      } finally {
+        Constant.WORKER_DISPOSE_TIMEOUT_MS = originalTimeout;
+      }
     });
   });
 }

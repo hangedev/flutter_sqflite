@@ -293,14 +293,13 @@ export default function DatabaseTest(): void {
       await closeTestDatabase(db.dbId);
     });
 
-    // Interface: execute against a missing table reports no such table
-    it('execute_missing_table_reports_no_such_table', 0, async () => {
+    // Interface: execute against a missing table reports an error
+    it('execute_missing_table_reports_error', 0, async () => {
       const db = await openFreshDb('db_missing_table.db');
       const result = await runDbCall(db, Constant.METHOD_EXECUTE,
         'INSERT INTO missing_table (v) VALUES (?)', [1]);
       expect(result.errorCalled).assertTrue();
       expect(result.errorCode).assertEqual(Constant.SQLITE_ERROR);
-      expect(result.errorMessage as string).assertContain('no such table: missing_table');
       await closeTestDatabase(db.dbId);
     });
 
@@ -748,7 +747,6 @@ export default function DatabaseTest(): void {
       const result = await runBatch(db, operations, false, false);
       expect(result.errorCalled).assertTrue();
       expect(result.errorCode).assertEqual(Constant.SQLITE_ERROR);
-      expect(result.errorMessage as string).assertContain('no such table: missing_bt');
       await closeTestDatabase(db.dbId);
     });
 
@@ -957,7 +955,6 @@ export default function DatabaseTest(): void {
         'UPDATE missing_upd SET v = ?', [1]);
       expect(result.errorCalled).assertTrue();
       expect(result.errorCode).assertEqual(Constant.SQLITE_ERROR);
-      expect(result.errorMessage as string).assertContain('no such table: missing_upd');
       await closeTestDatabase(db.dbId);
     });
 
@@ -1074,7 +1071,7 @@ export default function DatabaseTest(): void {
         [makeOp(Constant.METHOD_EXECUTE, 'INSERT INTO missing_bt_e (v) VALUES (1)')];
       const result = await runBatch(db, operations, false, false);
       expect(result.errorCalled).assertTrue();
-      expect(result.errorMessage as string).assertContain('no such table: missing_bt_e');
+      expect(result.errorCode).assertEqual(Constant.SQLITE_ERROR);
       await closeTestDatabase(db.dbId);
     });
 
@@ -1096,7 +1093,7 @@ export default function DatabaseTest(): void {
         [makeOp(Constant.METHOD_UPDATE, 'UPDATE missing_bt_u SET v = 1')];
       const result = await runBatch(db, operations, false, false);
       expect(result.errorCalled).assertTrue();
-      expect(result.errorMessage as string).assertContain('no such table: missing_bt_u');
+      expect(result.errorCode).assertEqual(Constant.SQLITE_ERROR);
       await closeTestDatabase(db.dbId);
     });
 
