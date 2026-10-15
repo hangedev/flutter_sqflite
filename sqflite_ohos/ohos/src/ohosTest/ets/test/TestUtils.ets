@@ -68,18 +68,47 @@ export function makeCall(method: string, args: Map<string, Object | null> | null
  */
 let currentContext: common.Context | null = null;
 
+// Must stay below Hypium's default 5s timeout: beforeAll callbacks are
+// wrapped with the same per-case timeout, so a longer deadline would be
+// cut off with 'execute timeout 5000ms' instead of our explicit error.
+const CONTEXT_INIT_DEADLINE_MS: number = 4000;
+const CONTEXT_INIT_POLL_MS: number = 200;
+
+function wait(ms: number): Promise<void> {
+  return new Promise<void>((resolve) => {
+    setTimeout(() => {
+      resolve();
+    }, ms);
+  });
+}
+
 /**
  * Capture the UIAbility context of the hvigor-injected test ability once.
  * getAppContext() is not usable here: it returns an ApplicationContext that
- * the relational store rejects with 401 'Illegal context'.
+ * the relational store rejects with 401 'Illegal context'. Right after
+ * install the delegator may briefly fail to report the top ability, so poll
+ * until a deadline instead of failing the whole suite on the first miss.
  */
 export async function initTestContext(): Promise<void> {
   if (currentContext !== null) {
     return;
   }
   const delegator = abilityDelegatorRegistry.getAbilityDelegator();
-  const ability: UIAbility = await delegator.getCurrentTopAbility();
-  currentContext = ability.context;
+  const deadline: number = Date.now() + CONTEXT_INIT_DEADLINE_MS;
+  while (Date.now() < deadline) {
+    try {
+      const ability: UIAbility = await delegator.getCurrentTopAbility();
+      if (ability !== null && ability !== undefined &&
+        ability.context !== null && ability.context !== undefined) {
+        currentContext = ability.context;
+        return;
+      }
+    } catch (e) {
+      // Ability delegator not ready yet: retry until the deadline
+    }
+    await wait(CONTEXT_INIT_POLL_MS);
+  }
+  throw new Error('Failed to obtain the test ability context from the ability delegator');
 }
 
 /**
